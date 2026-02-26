@@ -1009,12 +1009,14 @@ kbd {
 .settings-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
+  justify-content: center;
+  padding: 5px 10px;
   background: rgba(0, 0, 0, 0.12);
   border-bottom: 1px solid var(--border);
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-label {
@@ -1023,12 +1025,15 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .difficulty-selector {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .difficulty-buttons {
@@ -1036,12 +1041,13 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .difficulty-btn {
-  width: 24px;
-  height: 22px;
-  font-size: 11px;
+  width: 22px;
+  height: 20px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
   background: transparent;
@@ -1077,13 +1083,18 @@ kbd {
   font-size: 10px;
   color: var(--text-secondary);
   font-weight: 500;
-  min-width: 68px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 70px;
 }
 
 .color-selector {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .color-buttons {
@@ -1091,12 +1102,13 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .color-btn {
-  width: 28px;
-  height: 22px;
-  font-size: 14px;
+  width: 26px;
+  height: 20px;
+  font-size: 13px;
   color: var(--text-muted);
   background: transparent;
   border: none;
@@ -1131,9 +1143,16 @@ kbd {
 .interactive-board {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 6px 10px 4px;
+  align-items: stretch;
+  padding: 8px 0 4px;
   gap: 4px;
+  width: 100%;
+}
+
+/* Sizing container — fills the full width so ResizeObserver can measure it */
+.board-sizer {
+  width: 100%;
+  line-height: 0; /* prevent inline gap under the SVG board */
 }
 
 .board-controls {
@@ -1142,7 +1161,8 @@ kbd {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 2px 0;
+  padding: 2px 8px;
+  box-sizing: border-box;
 }
 
 .board-btn {
@@ -1160,6 +1180,7 @@ kbd {
   transition: all 0.15s ease;
   padding: 0;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .board-btn:hover {
@@ -1197,8 +1218,9 @@ kbd {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
-  padding: 2px 0;
+  width: 100%;
+  padding: 2px 8px;
+  box-sizing: border-box;
 }
 
 /* ========================================

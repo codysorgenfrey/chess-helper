@@ -287,9 +287,6 @@ export default function App(): React.ReactElement {
                 </button>
               ))}
             </div>
-            <span className="difficulty-label">
-              {DIFFICULTY_LABELS[difficulty]}
-            </span>
           </div>
           <div className="color-selector">
             <span className="settings-label">Play as</span>

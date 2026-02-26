@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { TouchBackend } from 'react-dnd-touch-backend';
 import { AppMode, MoveEvaluation, HintResult } from '../../shared/types';
+import { minimalPieces } from './MinimalPieces';
 
 interface InteractiveBoardProps {
   /** Current app mode */
@@ -49,7 +50,7 @@ export function InteractiveBoard({
   onMoveMade,
   onReset,
   onGameOver,
-  boardWidth = 280,
+  boardWidth: _boardWidthProp = 280,
   hint,
   moveEvaluation,
   isThinking,
@@ -57,6 +58,21 @@ export function InteractiveBoard({
   isBotThinking = false,
   triggerBotMoveRef,
 }: InteractiveBoardProps): React.ReactElement {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [boardWidth, setBoardWidth] = useState(280);
+
+  // Measure the container and size the board to fill it exactly
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width && width > 0) setBoardWidth(Math.floor(width));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>(
     'white',
@@ -333,24 +349,28 @@ export function InteractiveBoard({
         </button>
       </div>
 
-      <Chessboard
-        id="chess-helper-board"
-        position={position}
-        onPieceDrop={makeMove}
-        boardWidth={boardWidth}
-        boardOrientation={boardOrientation}
-        animationDuration={150}
-        arePiecesDraggable={true}
-        customDndBackend={TouchBackend}
-        customDndBackendOptions={{ enableMouseEvents: true }}
-        onPromotionCheck={() => false}
-        customBoardStyle={{
-          borderRadius: '4px',
-          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
-        }}
-        customDarkSquareStyle={{ backgroundColor: '#779952' }}
-        customLightSquareStyle={{ backgroundColor: '#edeed1' }}
-      />
+      {/* Sizing container — ResizeObserver measures this to set boardWidth */}
+      <div ref={containerRef} className="board-sizer">
+        <Chessboard
+          id="chess-helper-board"
+          position={position}
+          onPieceDrop={makeMove}
+          boardWidth={boardWidth}
+          boardOrientation={boardOrientation}
+          animationDuration={150}
+          arePiecesDraggable={true}
+          customDndBackend={TouchBackend}
+          customDndBackendOptions={{ enableMouseEvents: true }}
+          onPromotionCheck={() => false}
+          customPieces={minimalPieces}
+          customBoardStyle={{
+            borderRadius: '4px',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+          }}
+          customDarkSquareStyle={{ backgroundColor: '#6b7c8f' }}
+          customLightSquareStyle={{ backgroundColor: '#dce3eb' }}
+        />
+      </div>
 
       <div className="board-moves" title={moveHistory.join(' ')}>
         {recentMoves}
