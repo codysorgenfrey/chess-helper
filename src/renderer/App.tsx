@@ -29,7 +29,9 @@ export default function App(): React.ReactElement {
   const [showFenInput, setShowFenInput] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [hint, setHint] = useState<HintResult | null>(null);
-  const [moveEvaluation, setMoveEvaluation] = useState<MoveEvaluation | null>(null);
+  const [moveEvaluation, setMoveEvaluation] = useState<MoveEvaluation | null>(
+    null,
+  );
   const [currentFen, setCurrentFen] = useState(
     'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   );
@@ -42,7 +44,7 @@ export default function App(): React.ReactElement {
   const [isBotThinking, setIsBotThinking] = useState(false);
 
   // ── Modeler mode state ──
-  const [autoAnalyze, setAutoAnalyze] = useState(true);
+  const [autoAnalyze, setAutoAnalyze] = useState(false);
 
   const pendingHintRef = useRef<HintResult | null>(null);
 
@@ -341,7 +343,11 @@ export default function App(): React.ReactElement {
               isBotThinking={isBotThinking}
               onRequestHint={handleRequestHint}
               canRequestHint={
-                engine.isReady && !isThinking && !gameOver && !isBotThinking && isPlayerTurn
+                engine.isReady &&
+                !isThinking &&
+                !gameOver &&
+                !isBotThinking &&
+                isPlayerTurn
               }
               gameOver={gameOver}
               error={error}
