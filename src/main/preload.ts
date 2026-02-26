@@ -17,9 +17,6 @@ import {
 
 // Expose a minimal, type-safe API to the renderer
 contextBridge.exposeInMainWorld('chessHelper', {
-  triggerCapture: (): Promise<AnalysisResult> =>
-    ipcRenderer.invoke(IPC.TRIGGER_CAPTURE),
-
   setFenManual: (fen: string): Promise<AnalysisResult> =>
     ipcRenderer.invoke(IPC.SET_FEN_MANUAL, fen),
 
@@ -42,15 +39,6 @@ contextBridge.exposeInMainWorld('chessHelper', {
   analyzePosition: (fen: string): Promise<PositionAnalysis> =>
     ipcRenderer.invoke(IPC.ANALYZE_POSITION, { fen }),
 
-  onAnalysisUpdate: (cb: (result: AnalysisResult) => void): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      result: AnalysisResult,
-    ) => cb(result);
-    ipcRenderer.on(IPC.ANALYSIS_UPDATE, listener);
-    return () => ipcRenderer.removeListener(IPC.ANALYSIS_UPDATE, listener);
-  },
-
   onStatusUpdate: (cb: (update: StatusUpdate) => void): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
@@ -64,9 +52,6 @@ contextBridge.exposeInMainWorld('chessHelper', {
 
   saveSettings: (settings: Partial<AppSettings>): Promise<AppSettings> =>
     ipcRenderer.invoke(IPC.SAVE_SETTINGS, settings),
-
-  toggleSide: (side: 'w' | 'b'): Promise<AppSettings> =>
-    ipcRenderer.invoke(IPC.TOGGLE_SIDE, side),
 
   onSettingsChanged: (cb: (settings: AppSettings) => void): (() => void) => {
     const listener = (
@@ -145,7 +130,6 @@ contextBridge.exposeInMainWorld('chessHelper', {
 declare global {
   interface Window {
     chessHelper: {
-      triggerCapture: () => Promise<AnalysisResult>;
       setFenManual: (fen: string) => Promise<AnalysisResult>;
       getHint: (fen: string) => Promise<HintResult | { error: string }>;
       evaluateMove: (
@@ -158,11 +142,9 @@ declare global {
         difficulty: BotDifficulty,
       ) => Promise<BotMoveResult | { error: string }>;
       analyzePosition: (fen: string) => Promise<PositionAnalysis>;
-      onAnalysisUpdate: (cb: (result: AnalysisResult) => void) => () => void;
       onStatusUpdate: (cb: (update: StatusUpdate) => void) => () => void;
       getSettings: () => Promise<AppSettings>;
       saveSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>;
-      toggleSide: (side: 'w' | 'b') => Promise<AppSettings>;
       onSettingsChanged: (cb: (settings: AppSettings) => void) => () => void;
       getCalibration: () => Promise<CalibrationData | null>;
       calibration: {

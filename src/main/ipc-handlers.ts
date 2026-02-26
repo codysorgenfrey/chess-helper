@@ -13,10 +13,7 @@ import {
   PositionAnalysis,
 } from '../shared/types';
 import { EngineManager } from './engine/engine-manager';
-import { captureScreen } from './capture/screenshot';
-import { detectChessBoard } from './vision/board-detector';
-import { classifyPieces } from './vision/piece-classifier';
-import { buildFEN, validateFEN } from './vision/fen-builder';
+import { validateFEN } from './vision/fen-builder';
 import {
   captureScreenForCalibration,
   confirmBoardRegion,
@@ -30,7 +27,7 @@ import {
   getCalibration,
   saveCalibration,
 } from './store';
-import { getGameTracker, resetGameTracker } from './vision/game-tracker';
+import { resetGameTracker } from './vision/game-tracker';
 
 function sendStatus(win: BrowserWindow, status: string, message: string): void {
   win.webContents.send(IPC.STATUS_UPDATE, { status, message });
@@ -40,16 +37,6 @@ export function registerIpcHandlers(
   win: BrowserWindow,
   engine: EngineManager,
 ): void {
-  // Handle internal trigger (from global hotkey)
-  ipcMain.on('trigger-capture-internal', () => {
-    runCapturePipeline(win, engine);
-  });
-
-  // Handle renderer-invoked capture
-  ipcMain.handle(IPC.TRIGGER_CAPTURE, async () => {
-    return runCapturePipeline(win, engine);
-  });
-
   // Manual FEN input
   ipcMain.handle(IPC.SET_FEN_MANUAL, async (_event, fen: string) => {
     return runAnalysis(win, engine, fen, null, 1.0);
@@ -102,11 +89,6 @@ export function registerIpcHandlers(
     const updated = saveSettings(partial);
     win.webContents.send(IPC.SETTINGS_CHANGED, updated);
     return updated;
-  });
-
-  // Toggle side to move
-  ipcMain.handle(IPC.TOGGLE_SIDE, (_event, side: 'w' | 'b') => {
-    return saveSettings({ sideToMove: side });
   });
 
   // Get persisted calibration data (renderer checks on startup)
@@ -238,123 +220,6 @@ function registerCalibrationHandlers(win: BrowserWindow): void {
   });
 }
 
-async function runCapturePipeline(
-  win: BrowserWindow,
-  engine: EngineManager,
-): Promise<AnalysisResult> {
-  const settings = getSettings();
-
-  try {
-    // Step 1: Capture screen
-    sendStatus(win, 'capturing', 'Capturing screen…');
-    const screenshot = await captureScreen();
-
-    // Step 2: Determine board location
-    sendStatus(win, 'detecting', 'Detecting chess board…');
-    let board: DetectedBoard | null = null;
-    const cal = getCalibration();
-
-    if (cal) {
-      // Use the calibrated board rectangle directly — much more reliable
-      // than the heuristic board detector.
-      const r = cal.boardRect;
-      board = {
-        x: r.x,
-        y: r.y,
-        width: r.width,
-        height: r.height,
-        squareSize: Math.round(r.width / 8),
-        isFlipped: cal.isFlipped,
-        confidence: 1.0,
-      };
-      console.log(
-        `[Pipeline] Using calibrated board rect: x=${r.x} y=${r.y} w=${r.width} h=${r.height} flipped=${cal.isFlipped}`,
-      );
-    } else {
-      // No calibration — fall back to heuristic board detection
-      board = await detectChessBoard(screenshot.buffer);
-    }
-
-    if (!board) {
-      const result: AnalysisResult = {
-        fen: '',
-        moves: [],
-        detectedBoard: null,
-        boardGridConfidence: 0,
-        timestamp: Date.now(),
-        error: 'No chess board detected. Try manual FEN input.',
-      };
-      win.webContents.send(IPC.ANALYSIS_UPDATE, result);
-      sendStatus(win, 'error', 'No board detected');
-      return result;
-    }
-
-    // Step 3: Classify the board visually then match to legal moves
-    sendStatus(win, 'classifying', 'Classifying board…');
-    const { grid, confidence: classifierConfidence } = await classifyPieces(
-      screenshot.buffer,
-      board,
-    );
-
-    console.log(
-      `[Pipeline] Classifier confidence: ${(classifierConfidence * 100).toFixed(1)}%`,
-    );
-
-    // Step 4: Use game tracker to match classified grid to legal moves
-    sendStatus(win, 'classifying', 'Matching position to game state…');
-    const tracker = getGameTracker();
-    const trackResult = tracker.processClassifiedGrid(grid);
-
-    if (trackResult) {
-      const { fen, confidence, movesApplied } = trackResult;
-      if (movesApplied.length > 0) {
-        console.log(
-          `[Pipeline] Tracked moves: ${movesApplied.join(', ')} → FEN: ${fen}`,
-        );
-      } else {
-        console.log(`[Pipeline] No moves detected. FEN: ${fen}`);
-      }
-
-      return runAnalysis(win, engine, fen, board, confidence);
-    }
-
-    // Tracker couldn't find a good legal continuation — fall back to raw FEN
-    console.warn(
-      '[Pipeline] Game tracker could not match — building FEN from classifier',
-    );
-    sendStatus(win, 'analyzing', 'Building position…');
-    const fen = buildFEN(grid, settings.sideToMove, settings.castlingRights);
-
-    if (!fen) {
-      const result: AnalysisResult = {
-        fen: '',
-        moves: [],
-        detectedBoard: board,
-        boardGridConfidence: classifierConfidence,
-        timestamp: Date.now(),
-        error: 'Could not determine position. Try manual FEN input.',
-      };
-      win.webContents.send(IPC.ANALYSIS_UPDATE, result);
-      sendStatus(win, 'error', 'Invalid position detected');
-      return result;
-    }
-
-    return runAnalysis(win, engine, fen, board, classifierConfidence);
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    const result: AnalysisResult = {
-      fen: '',
-      moves: [],
-      detectedBoard: null,
-      boardGridConfidence: 0,
-      timestamp: Date.now(),
-      error: errorMsg,
-    };
-    win.webContents.send(IPC.ANALYSIS_UPDATE, result);
-    sendStatus(win, 'error', errorMsg.split('\n')[0]);
-    return result;
-  }
-}
 
 async function runAnalysis(
   win: BrowserWindow,

@@ -35,16 +35,6 @@ export function createTray(win: BrowserWindow, app: App): Tray {
           updateMenu(!isVisible);
         },
       },
-      {
-        label: 'Analyze Board (⌘⇧C)',
-        click: () => {
-          win.show();
-          win.webContents.send('status-update', { status: 'capturing', message: 'Capturing screen…' });
-          // Trigger via ipcMain internal event
-          const { ipcMain } = require('electron');
-          ipcMain.emit('trigger-capture-internal');
-        },
-      },
       { type: 'separator' },
       {
         label: 'Quit Chess Helper',
@@ -76,8 +66,5 @@ export function createTray(win: BrowserWindow, app: App): Tray {
 }
 
 function createDefaultIcon(): Electron.NativeImage {
-  const { nativeImage } = require('electron');
-  // Create a minimal 16x16 PNG (chess knight ♞ approximation)
-  // This is a transparent placeholder — ideally you'd use a real .png asset
   return nativeImage.createEmpty();
 }

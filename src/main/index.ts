@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, Tray } from 'electron';
+import { app, BrowserWindow, Tray } from 'electron';
 import * as path from 'path';
 import { EngineManager } from './engine/engine-manager';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -94,24 +94,6 @@ async function initializeEngine(): Promise<void> {
   }
 }
 
-function registerHotkey(win: BrowserWindow): void {
-  const settings = getSettings();
-  const hotkey = settings.captureHotkey;
-
-  const success = globalShortcut.register(hotkey, () => {
-    win.webContents.send('status-update', {
-      status: 'capturing',
-      message: 'Capturing screen…',
-    });
-    ipcMain.emit('trigger-capture-internal');
-  });
-
-  if (!success) {
-    console.warn('[Main] Failed to register hotkey:', hotkey);
-  } else {
-    console.log('[Main] Hotkey registered:', hotkey);
-  }
-}
 
 app.whenReady().then(async () => {
   initStore();
@@ -119,7 +101,6 @@ app.whenReady().then(async () => {
 
   registerIpcHandlers(mainWindow, engineManager);
   tray = createTray(mainWindow, app);
-  registerHotkey(mainWindow);
 
   // Initialize engine in background
   initializeEngine();
@@ -141,7 +122,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
   engineManager.shutdown();
 });
 
