@@ -46,6 +46,58 @@ export interface AnalysisResult {
   error?: string;
 }
 
+export interface HintResult {
+  bestMove: EngineMove;
+  fen: string;
+  coachingHint: string; // Textual coaching guidance (doesn't reveal the exact move)
+}
+
+/** App operating mode */
+export type AppMode = 'modeler' | 'coach';
+
+/** Difficulty level 1-5 for the bot opponent */
+export type BotDifficulty = 1 | 2 | 3 | 4 | 5;
+
+/** An engine move enriched with a human-readable description */
+export interface AnalyzedMove extends EngineMove {
+  description: string;
+}
+
+/** Result of a full position analysis for the modeler */
+export interface PositionAnalysis {
+  fen: string;
+  moves: AnalyzedMove[];
+  error?: string;
+}
+
+export interface BotMoveResult {
+  moveUci: string;
+  moveSan: string;
+  fen: string; // FEN after the bot's move
+}
+
+export type MoveQuality =
+  | 'best'
+  | 'excellent'
+  | 'good'
+  | 'inaccuracy'
+  | 'mistake'
+  | 'blunder';
+
+export interface MoveEvaluation {
+  userMoveSan: string;
+  userMoveUci: string;
+  userMoveScoreCp: number | null;
+  userMoveMateIn: number | null;
+  bestMoveSan: string;
+  bestMoveUci: string;
+  bestMoveScoreCp: number | null;
+  bestMoveMateIn: number | null;
+  quality: MoveQuality;
+  explanation: string;
+  centipawnLoss: number;
+}
+
 export interface AppSettings {
   captureHotkey: string; // e.g. "CommandOrControl+Shift+C"
   sideToMove: 'w' | 'b';

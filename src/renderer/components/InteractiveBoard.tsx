@@ -1,13 +1,40 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { TouchBackend } from 'react-dnd-touch-backend';
+import { AppMode, MoveEvaluation, HintResult } from '../../shared/types';
 
 interface InteractiveBoardProps {
-  /** Called with the FEN after each move (or on reset). */
-  onPositionChange: (fen: string) => void;
+  /** Current app mode */
+  mode: AppMode;
+  /** Called after any move is made (user or bot). */
+  onMoveMade?: (info: {
+    fenBefore: string;
+    moveUci: string;
+    moveSan: string;
+    fenAfter: string;
+    isUserMove: boolean;
+  }) => void;
+  /** Called when the board is reset */
+  onReset?: () => void;
+  /** Called when the game ends (checkmate, stalemate, draw) */
+  onGameOver?: () => void;
   /** Board width in pixels. */
   boardWidth?: number;
+  /** Hint data to show on the board */
+  hint?: HintResult | null;
+  /** Move evaluation result to show */
+  moveEvaluation?: MoveEvaluation | null;
+  /** Whether a hint/eval request is in progress */
+  isThinking?: boolean;
+  /** Which color the player is (coach mode) */
+  playerColor?: 'white' | 'black';
+  /** Whether the bot is currently thinking (coach mode) */
+  isBotThinking?: boolean;
+  /** Ref that App uses to trigger a bot move on the board (coach mode) */
+  triggerBotMoveRef?: React.MutableRefObject<
+    ((moveUci: string, moveSan: string) => void) | null
+  >;
 }
 
 /**
@@ -18,8 +45,17 @@ interface InteractiveBoardProps {
  * Side to move, castling rights, en passant, etc. are all tracked automatically.
  */
 export function InteractiveBoard({
-  onPositionChange,
+  mode,
+  onMoveMade,
+  onReset,
+  onGameOver,
   boardWidth = 280,
+  hint,
+  moveEvaluation,
+  isThinking,
+  playerColor = 'white',
+  isBotThinking = false,
+  triggerBotMoveRef,
 }: InteractiveBoardProps): React.ReactElement {
   const [game, setGame] = useState(new Chess());
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>(
@@ -27,13 +63,116 @@ export function InteractiveBoard({
   );
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
 
-  const position = useMemo(() => game.fen(), [game, moveHistory]);
+  // Free-placement position for modeler mode (FEN string)
+  const [freePosition, setFreePosition] = useState(new Chess().fen());
+  // Undo stack for modeler free mode
+  const [freeHistory, setFreeHistory] = useState<string[]>([]);
 
-  // Apply a move and notify parent
+  // Keep board orientation in sync with player color
+  useEffect(() => {
+    setBoardOrientation(playerColor);
+  }, [playerColor]);
+
+  const position = useMemo(() => {
+    if (mode === 'modeler') return freePosition;
+    return game.fen();
+  }, [mode, game, moveHistory, freePosition]);
+
+  // Apply a bot move externally via ref
+  useEffect(() => {
+    if (triggerBotMoveRef) {
+      triggerBotMoveRef.current = (moveUci: string, _moveSan: string) => {
+        try {
+          const fenBefore = game.fen();
+          const move = game.move({
+            from: moveUci.slice(0, 2) as Square,
+            to: moveUci.slice(2, 4) as Square,
+            promotion: moveUci[4] || undefined,
+          });
+          if (move) {
+            setMoveHistory((prev) => [...prev, move.san]);
+            const fenAfter = game.fen();
+            const newGame = new Chess(fenAfter);
+            setGame(newGame);
+            onMoveMade?.({
+              fenBefore,
+              moveUci: move.from + move.to + (move.promotion || ''),
+              moveSan: move.san,
+              fenAfter,
+              isUserMove: false,
+            });
+            if (
+              newGame.isCheckmate() ||
+              newGame.isDraw() ||
+              newGame.isStalemate()
+            ) {
+              onGameOver?.();
+            }
+          }
+        } catch {
+          // Invalid bot move
+        }
+      };
+    }
+  }, [game, onMoveMade, onGameOver, triggerBotMoveRef]);
+
+  // Apply a user move via drag/drop
   const makeMove = useCallback(
     (sourceSquare: Square, targetSquare: Square, piece: string): boolean => {
+      if (sourceSquare === targetSquare) return false;
+
+      // ── Modeler mode: free placement (no rule enforcement) ──
+      if (mode === 'modeler') {
+        try {
+          const fenBefore = freePosition;
+          // Parse piece string from react-chessboard ("wP", "bN", etc.)
+          const color = piece[0] === 'w' ? 'w' : 'b';
+          const typeChar = piece[1].toLowerCase();
+          const tempGame = new Chess(freePosition);
+
+          // Remove from source
+          tempGame.remove(sourceSquare);
+          // Remove whatever is on target (capture)
+          tempGame.remove(targetSquare);
+          // Place piece on target
+          tempGame.put(
+            {
+              type: typeChar as 'p' | 'n' | 'b' | 'r' | 'q' | 'k',
+              color: color as 'w' | 'b',
+            },
+            targetSquare,
+          );
+
+          const fenAfter = tempGame.fen();
+
+          // Push current position to undo stack
+          setFreeHistory((prev) => [...prev, fenBefore]);
+          setFreePosition(fenAfter);
+
+          const label = `${piece[1]}${sourceSquare}-${targetSquare}`;
+          setMoveHistory((prev) => [...prev, label]);
+          onMoveMade?.({
+            fenBefore,
+            moveUci: sourceSquare + targetSquare,
+            moveSan: label,
+            fenAfter,
+            isUserMove: true,
+          });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      // ── Coach mode: enforce rules ──
+      const sideToMove = game.turn() === 'w' ? 'white' : 'black';
+      if (sideToMove !== playerColor || isBotThinking) {
+        return false;
+      }
+
       try {
-        // Determine promotion piece if applicable
+        const fenBefore = game.fen();
+
         const isPromotion =
           piece[1] === 'P' &&
           ((piece[0] === 'w' && targetSquare[1] === '8') ||
@@ -42,14 +181,28 @@ export function InteractiveBoard({
         const move = game.move({
           from: sourceSquare,
           to: targetSquare,
-          promotion: isPromotion ? 'q' : undefined, // auto-queen
+          promotion: isPromotion ? 'q' : undefined,
         });
 
         if (move) {
           setMoveHistory((prev) => [...prev, move.san]);
-          // Force re-render by creating new reference
-          setGame(new Chess(game.fen()));
-          onPositionChange(game.fen());
+          const fenAfter = game.fen();
+          const newGame = new Chess(fenAfter);
+          setGame(newGame);
+          onMoveMade?.({
+            fenBefore,
+            moveUci: move.from + move.to + (move.promotion || ''),
+            moveSan: move.san,
+            fenAfter,
+            isUserMove: true,
+          });
+          if (
+            newGame.isCheckmate() ||
+            newGame.isDraw() ||
+            newGame.isStalemate()
+          ) {
+            onGameOver?.();
+          }
           return true;
         }
       } catch {
@@ -57,24 +210,56 @@ export function InteractiveBoard({
       }
       return false;
     },
-    [game, onPositionChange],
+    [
+      game,
+      onMoveMade,
+      onGameOver,
+      playerColor,
+      isBotThinking,
+      mode,
+      freePosition,
+    ],
   );
 
   const handleUndo = useCallback(() => {
-    const move = game.undo();
-    if (move) {
-      setMoveHistory((prev) => prev.slice(0, -1));
-      setGame(new Chess(game.fen()));
-      onPositionChange(game.fen());
+    if (mode === 'modeler') {
+      // Modeler free mode: pop from our undo stack
+      if (freeHistory.length > 0) {
+        const prev = freeHistory[freeHistory.length - 1];
+        setFreeHistory((h) => h.slice(0, -1));
+        setFreePosition(prev);
+        setMoveHistory((m) => m.slice(0, -1));
+        onMoveMade?.({
+          fenBefore: freePosition,
+          moveUci: '',
+          moveSan: 'undo',
+          fenAfter: prev,
+          isUserMove: true,
+        });
+      }
+    } else {
+      // Coach: undo 2 moves (bot + user) so it's the user's turn again
+      const move1 = game.undo();
+      if (move1) {
+        const move2 = game.undo();
+        if (move2) {
+          setMoveHistory((prev) => prev.slice(0, -2));
+        } else {
+          setMoveHistory((prev) => prev.slice(0, -1));
+        }
+        setGame(new Chess(game.fen()));
+      }
     }
-  }, [game, onPositionChange]);
+  }, [game, mode, freeHistory, freePosition, onMoveMade]);
 
   const handleReset = useCallback(() => {
     const newGame = new Chess();
     setGame(newGame);
     setMoveHistory([]);
-    onPositionChange(newGame.fen());
-  }, [onPositionChange]);
+    setFreePosition(newGame.fen());
+    setFreeHistory([]);
+    onReset?.();
+  }, [onReset]);
 
   const handleFlip = useCallback(() => {
     setBoardOrientation((prev) => (prev === 'white' ? 'black' : 'white'));
@@ -97,15 +282,28 @@ export function InteractiveBoard({
     return parts.join(' ');
   }, [moveHistory]);
 
+  // Reset when mode changes
+  useEffect(() => {
+    const newGame = new Chess();
+    setGame(newGame);
+    setMoveHistory([]);
+    setFreePosition(newGame.fen());
+    setFreeHistory([]);
+  }, [mode]);
+
   // Status text
   const statusText = useMemo(() => {
+    if (mode === 'modeler') {
+      return 'Free placement — drag pieces anywhere';
+    }
     if (game.isCheckmate()) return 'Checkmate!';
     if (game.isDraw()) return 'Draw';
     if (game.isStalemate()) return 'Stalemate';
+    if (isBotThinking) return 'Opponent thinking…';
     if (game.isCheck())
       return game.turn() === 'w' ? 'White in check' : 'Black in check';
     return game.turn() === 'w' ? 'White to move' : 'Black to move';
-  }, [game, moveHistory]);
+  }, [game, moveHistory, isBotThinking, mode]);
 
   return (
     <div className="interactive-board">
@@ -113,7 +311,11 @@ export function InteractiveBoard({
         <button
           className="board-btn"
           onClick={handleUndo}
-          disabled={moveHistory.length === 0}
+          disabled={
+            mode === 'modeler'
+              ? freeHistory.length === 0
+              : moveHistory.length === 0
+          }
           title="Undo last move"
         >
           ↩

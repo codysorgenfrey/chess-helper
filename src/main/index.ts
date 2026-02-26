@@ -27,18 +27,18 @@ function createWindow(): BrowserWindow {
 
   const win = new BrowserWindow({
     width: 320,
-    height: 620,
+    height: 700,
     minWidth: 320,
     maxWidth: 320,
-    minHeight: 620,
-    maxHeight: 620,
+    minHeight: 500,
+    maxHeight: 1200,
     useContentSize: true,
     x: settings.windowX ?? undefined,
     y: settings.windowY ?? undefined,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    resizable: false,
+    resizable: true,
     skipTaskbar: true,
     hasShadow: false,
     webPreferences: {

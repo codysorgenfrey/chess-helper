@@ -4,6 +4,10 @@ export const IPC = {
   // Renderer → Main (invoke)
   TRIGGER_CAPTURE: 'trigger-capture',
   SET_FEN_MANUAL: 'set-fen-manual',
+  GET_HINT: 'get-hint',
+  EVALUATE_MOVE: 'evaluate-move',
+  GET_BOT_MOVE: 'get-bot-move',
+  ANALYZE_POSITION: 'analyze-position',
   GET_SETTINGS: 'get-settings',
   SAVE_SETTINGS: 'save-settings',
   TOGGLE_SIDE: 'toggle-side',
