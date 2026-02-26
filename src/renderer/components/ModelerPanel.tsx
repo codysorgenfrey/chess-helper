@@ -8,6 +8,8 @@ interface ModelerPanelProps {
   autoAnalyze: boolean;
   /** Toggle auto-analyze on/off */
   onToggleAutoAnalyze: () => void;
+  /** Analyze a position — provided by useChessEngine hook */
+  analyzePosition: (fen: string) => Promise<PositionAnalysis>;
 }
 
 function formatEval(move: AnalyzedMove): { text: string; className: string } {
@@ -37,6 +39,7 @@ export function ModelerPanel({
   currentFen,
   autoAnalyze,
   onToggleAutoAnalyze,
+  analyzePosition,
 }: ModelerPanelProps): React.ReactElement {
   const [analysis, setAnalysis] = useState<PositionAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -47,7 +50,7 @@ export function ModelerPanel({
     setIsAnalyzing(true);
     setExpandedIdx(null);
     try {
-      const result = await window.chessHelper.analyzePosition(fen);
+      const result = await analyzePosition(fen);
       setAnalysis(result);
     } catch (err) {
       setAnalysis({

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DetectedBoard, StatusUpdate } from '../../shared/types';
+import { StatusUpdate } from '../../shared/types';
 
 interface StatusBarProps {
   status: StatusUpdate;
@@ -7,7 +7,6 @@ interface StatusBarProps {
   sideToMove: 'w' | 'b';
   onToggleSide: (side: 'w' | 'b') => void;
   onCapture: () => void;
-  detectedBoard: DetectedBoard | null;
   confidence: number | null;
 }
 
@@ -17,7 +16,6 @@ export function StatusBar({
   sideToMove,
   onToggleSide,
   onCapture,
-  detectedBoard,
   confidence,
 }: StatusBarProps): React.ReactElement {
   const statusClass = getStatusClass(status.status);
@@ -79,14 +77,19 @@ export function StatusBar({
 
 function getStatusClass(statusType: string): string {
   switch (statusType) {
-    case 'idle': return 'status--idle';
+    case 'idle':
+      return 'status--idle';
     case 'capturing':
     case 'detecting':
     case 'classifying':
-    case 'analyzing': return 'status--working';
-    case 'done': return 'status--done';
-    case 'error': return 'status--error';
-    default: return 'status--idle';
+    case 'analyzing':
+      return 'status--working';
+    case 'done':
+      return 'status--done';
+    case 'error':
+      return 'status--error';
+    default:
+      return 'status--idle';
   }
 }
 

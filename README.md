@@ -1,71 +1,35 @@
-# Chess Helper Overlay
+# Chess Helper
 
-An always-on-top Electron overlay that detects chess boards on your screen and shows the top 5 best moves using Stockfish.
+A browser-based chess coaching and analysis tool powered by Stockfish WASM.
 
 ## Setup
-
-### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Download Stockfish
-
-Download the appropriate Stockfish binary from https://stockfishchess.org/download/ and place it in `assets/stockfish/`:
-
-| Platform | Filename |
-|----------|----------|
-| macOS | `assets/stockfish/stockfish-mac` |
-| Windows | `assets/stockfish/stockfish-win.exe` |
-| Linux | `assets/stockfish/stockfish-linux` |
-
-Make the binary executable (macOS/Linux):
-```bash
-chmod +x assets/stockfish/stockfish-mac
-```
-
-### 3. Run in Development
+## Development
 
 ```bash
-npm start
+npm run dev
 ```
 
-### 4. macOS Screen Recording Permission
+## Build
 
-On first launch, macOS will prompt for Screen Recording permission. Go to:
-**System Settings → Privacy & Security → Screen Recording** and enable Chess Helper Overlay, then restart the app.
+```bash
+npm run build
+npm run preview
+```
 
 ## Usage
 
-| Action | How |
-|--------|-----|
-| Analyze board | Press **⌘⇧C** (Cmd+Shift+C) |
-| Move window | Drag the title bar |
-| Toggle side to move | Click **W** or **B** buttons |
-| Manual FEN entry | Click the ✎ button or press ⌘⇧C when no board is detected |
-| Hide/show overlay | Double-click the tray icon |
-| Quit | Right-click tray → Quit |
+- **Enter a FEN** to load any position
+- **Toggle side to move** with the W / B buttons
+- **Coach mode**: get hints and move evaluations as you play against the engine
+- **Modeler mode**: see the top 5 engine moves with evaluations and strength bars
 
 ## How It Works
 
-1. **Screenshot**: Captures your screen when you press ⌘⇧C
-2. **Board Detection**: Finds checkerboard patterns using contrast analysis
-3. **Piece Classification**: Identifies pieces by brightness/color heuristics
-4. **FEN Assembly**: Builds a valid FEN string (validated with chess.js)
-5. **Engine Analysis**: Runs Stockfish at depth 18 with MultiPV 5
-6. **Display**: Shows top 5 moves with evaluations and strength bars
-
-## Notes
-
-- Piece detection works best with standard piece sets (Chess.com default, Lichess CBurnett)
-- If auto-detection fails, use the manual FEN input (✎ button)
-- Board orientation is auto-detected; toggle W/B if it's wrong
-- En passant cannot be detected from a static screenshot; use manual FEN for those positions
-
-## Package for Distribution
-
-```bash
-npm run make
-```
-# chess-helper
+1. Enter a FEN string or use the starting position
+2. Stockfish WASM runs in a Web Worker (depth 18, MultiPV 5)
+3. Top moves are displayed with centipawn evaluations and principal variations

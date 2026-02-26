@@ -43,19 +43,9 @@ html,
 body,
 #root {
   width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: transparent;
-}
-
-/* ========================================
-   Scroll Area — makes content scroll within the window
-   ======================================== */
-.app-scroll-area {
-  flex: 1;
-  overflow-y: auto;
+  min-height: 100dvh;
   overflow-x: hidden;
-  min-height: 0;
+  background: var(--bg-primary);
 }
 
 body {
@@ -73,16 +63,10 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 0 0 0.5px rgba(255, 255, 255, 0.05) inset;
-  overflow: hidden;
 }
 
 /* ========================================
@@ -127,7 +111,7 @@ body {
 }
 
 /* ========================================
-   Title Bar (draggable)
+   Title Bar
    ======================================== */
 .title-bar {
   display: flex;
@@ -136,16 +120,12 @@ body {
   padding: 10px 14px 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid var(--border);
-  cursor: default;
   flex-shrink: 0;
-}
-
-.drag-region {
-  -webkit-app-region: drag;
-}
-
-.drag-region button {
-  -webkit-app-region: no-drag;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .title-icon {
@@ -159,6 +139,13 @@ body {
   font-weight: 600;
   letter-spacing: 0.3px;
   color: var(--text-primary);
+}
+
+.engine-loading {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
 /* ========================================
@@ -1766,4 +1753,75 @@ kbd {
   color: var(--text-secondary);
   line-height: 1.5;
   max-width: 240px;
+}
+
+/* ========================================
+   Responsive Two-Column Layout
+   ======================================== */
+
+/* Main content area: side-by-side on desktop */
+.app-main {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  align-items: flex-start;
+  gap: 0;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 12px 24px;
+  box-sizing: border-box;
+}
+
+/* Board column: takes up space proportional to board size */
+.app-board-col {
+  flex: 0 0 auto;
+  width: min(440px, 55%);
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Panel column: fills the rest */
+.app-panel-col {
+  flex: 1;
+  min-width: 240px;
+  max-width: 440px;
+  overflow-y: auto;
+  padding-left: 12px;
+  box-sizing: border-box;
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 680px) {
+  .app-main {
+    flex-direction: column;
+    padding: 8px 8px 24px;
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .app-board-col {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .app-panel-col {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 0;
+    min-width: unset;
+  }
+}
+
+/* Tablet: allow slightly smaller board */
+@media (min-width: 681px) and (max-width: 900px) {
+  .app-main {
+    padding: 10px 10px 24px;
+  }
+
+  .app-board-col {
+    width: min(380px, 50%);
+  }
 }

@@ -1,15 +1,15 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   AppMode,
   BotDifficulty,
   HintResult,
   MoveEvaluation,
-  StatusUpdate,
 } from '../shared/types';
 import { FenInput } from './components/FenInput';
 import { InteractiveBoard } from './components/InteractiveBoard';
 import { CoachingPanel } from './components/CoachingPanel';
 import { ModelerPanel } from './components/ModelerPanel';
+import { useChessEngine } from '../engine/useChessEngine';
 
 const DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
   1: 'Beginner',
@@ -20,19 +20,16 @@ const DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
 };
 
 export default function App(): React.ReactElement {
+  // ── Engine hook (replaces window.chessHelper.* IPC) ──
+  const engine = useChessEngine();
+
   // ── Mode ──
   const [mode, setMode] = useState<AppMode>('coach');
 
-  const [status, setStatus] = useState<StatusUpdate>({
-    status: 'idle',
-    message: 'Play a move or ask for a hint',
-  });
   const [showFenInput, setShowFenInput] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [hint, setHint] = useState<HintResult | null>(null);
-  const [moveEvaluation, setMoveEvaluation] = useState<MoveEvaluation | null>(
-    null,
-  );
+  const [moveEvaluation, setMoveEvaluation] = useState<MoveEvaluation | null>(null);
   const [currentFen, setCurrentFen] = useState(
     'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   );
@@ -47,38 +44,24 @@ export default function App(): React.ReactElement {
   // ── Modeler mode state ──
   const [autoAnalyze, setAutoAnalyze] = useState(true);
 
-  // Track the FEN from before the last move (for evaluation)
   const pendingHintRef = useRef<HintResult | null>(null);
-  const cleanupRef = useRef<(() => void)[]>([]);
 
   // Ref to trigger bot move from the board component
   const triggerBotMoveRef = useRef<
     ((moveUci: string, moveSan: string) => void) | null
   >(null);
 
-  useEffect(() => {
-    const unsubStatus = window.chessHelper.onStatusUpdate((update) => {
-      setStatus(update);
-    });
-    cleanupRef.current = [unsubStatus];
-    return () => {
-      cleanupRef.current.forEach((fn) => fn());
-    };
-  }, []);
-
   // ── Mode switching ──
   const handleModeChange = useCallback(
     (newMode: AppMode) => {
       if (newMode === mode) return;
       setMode(newMode);
-      // Reset shared state
       setHint(null);
       setMoveEvaluation(null);
       setError(null);
       setGameOver(false);
       setIsBotThinking(false);
       pendingHintRef.current = null;
-      // Reset board to starting position
       setCurrentFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
     },
     [mode],
@@ -90,7 +73,7 @@ export default function App(): React.ReactElement {
       if (mode !== 'coach') return;
       setIsBotThinking(true);
       try {
-        const result = await window.chessHelper.getBotMove(fen, difficulty);
+        const result = await engine.getBotMove(fen, difficulty);
         if ('error' in result) {
           setError(result.error);
         } else {
@@ -103,7 +86,7 @@ export default function App(): React.ReactElement {
         setIsBotThinking(false);
       }
     },
-    [difficulty, mode],
+    [difficulty, mode, engine],
   );
 
   // ── Hint (coach mode) ──
@@ -113,7 +96,7 @@ export default function App(): React.ReactElement {
     setMoveEvaluation(null);
 
     try {
-      const result = await window.chessHelper.getHint(currentFen);
+      const result = await engine.getHint(currentFen);
       if ('error' in result) {
         setError(result.error);
         setHint(null);
@@ -129,7 +112,7 @@ export default function App(): React.ReactElement {
     } finally {
       setIsThinking(false);
     }
-  }, [currentFen]);
+  }, [currentFen, engine]);
 
   // ── Move made on board ──
   const handleMoveMade = useCallback(
@@ -143,20 +126,17 @@ export default function App(): React.ReactElement {
       setCurrentFen(info.fenAfter);
       setError(null);
 
-      // ── Modeler mode: just update FEN (analysis is triggered via useEffect in ModelerPanel)
-      if (mode === 'modeler') {
-        return;
-      }
+      // Modeler mode: just update FEN (ModelerPanel reacts via useEffect)
+      if (mode === 'modeler') return;
 
-      // ── Coach mode ──
+      // Coach mode: only handle user moves here
       if (!info.isUserMove) return;
 
-      // Evaluate if hint was pending
       if (pendingHintRef.current) {
         setIsThinking(true);
         setHint(null);
         try {
-          const result = await window.chessHelper.evaluateMove(
+          const result = await engine.evaluateMove(
             info.fenBefore,
             info.moveUci,
             info.moveSan,
@@ -177,12 +157,12 @@ export default function App(): React.ReactElement {
         setMoveEvaluation(null);
       }
 
-      // Bot responds
+      // Bot responds after a short delay
       setTimeout(() => {
         requestBotMove(info.fenAfter);
       }, 300);
     },
-    [mode, requestBotMove],
+    [mode, requestBotMove, engine],
   );
 
   // ── Undo (coach mode) ──
@@ -198,7 +178,8 @@ export default function App(): React.ReactElement {
 
   // ── Reset ──
   const handleReset = useCallback(() => {
-    setCurrentFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+    const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    setCurrentFen(startFen);
     setHint(null);
     setMoveEvaluation(null);
     setError(null);
@@ -208,9 +189,7 @@ export default function App(): React.ReactElement {
 
     if (mode === 'coach' && playerColor === 'black') {
       setTimeout(() => {
-        requestBotMove(
-          'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-        );
+        requestBotMove(startFen);
       }, 500);
     }
   }, [mode, playerColor, requestBotMove]);
@@ -252,9 +231,12 @@ export default function App(): React.ReactElement {
   return (
     <div className="app-container">
       {/* Title bar */}
-      <div className="title-bar drag-region">
+      <div className="title-bar">
         <span className="title-icon">♟</span>
         <span className="title-text">Chess Helper</span>
+        {!engine.isReady && (
+          <span className="engine-loading">Loading engine…</span>
+        )}
         <button
           className="btn-icon"
           onClick={showFenToggle}
@@ -321,35 +303,36 @@ export default function App(): React.ReactElement {
         </div>
       )}
 
-      {/* Scrollable content area */}
-      <div className="app-scroll-area">
-        {/* Interactive board */}
-        <InteractiveBoard
-          mode={mode}
-          onMoveMade={handleMoveMade}
-          onReset={handleReset}
-          onUndo={handleUndo}
-          onGameOver={handleGameOver}
-          boardWidth={280}
-          hint={hint}
-          moveEvaluation={moveEvaluation}
-          isThinking={isThinking || isBotThinking}
-          playerColor={playerColor}
-          isBotThinking={isBotThinking}
-          triggerBotMoveRef={triggerBotMoveRef}
-        />
-
-        {/* FEN input */}
-        {showFenInput && (
-          <FenInput
-            currentFen={currentFen}
-            onSubmit={handleFenSubmit}
-            onClose={() => setShowFenInput(false)}
+      {/* Main content — responsive two-column on desktop, stacked on mobile */}
+      <div className="app-main">
+        {/* Board column */}
+        <div className="app-board-col">
+          <InteractiveBoard
+            mode={mode}
+            onMoveMade={handleMoveMade}
+            onReset={handleReset}
+            onUndo={handleUndo}
+            onGameOver={handleGameOver}
+            hint={hint}
+            moveEvaluation={moveEvaluation}
+            isThinking={isThinking || isBotThinking}
+            playerColor={playerColor}
+            isBotThinking={isBotThinking}
+            triggerBotMoveRef={triggerBotMoveRef}
           />
-        )}
 
-        {/* Mode-specific panel */}
-        <div className="content">
+          {/* FEN input — shown below board on mobile, inline on desktop */}
+          {showFenInput && (
+            <FenInput
+              currentFen={currentFen}
+              onSubmit={handleFenSubmit}
+              onClose={() => setShowFenInput(false)}
+            />
+          )}
+        </div>
+
+        {/* Panel column */}
+        <div className="app-panel-col">
           {mode === 'coach' ? (
             <CoachingPanel
               hint={hint}
@@ -358,7 +341,7 @@ export default function App(): React.ReactElement {
               isBotThinking={isBotThinking}
               onRequestHint={handleRequestHint}
               canRequestHint={
-                !isThinking && !gameOver && !isBotThinking && isPlayerTurn
+                engine.isReady && !isThinking && !gameOver && !isBotThinking && isPlayerTurn
               }
               gameOver={gameOver}
               error={error}
@@ -369,6 +352,7 @@ export default function App(): React.ReactElement {
               currentFen={currentFen}
               autoAnalyze={autoAnalyze}
               onToggleAutoAnalyze={handleToggleAutoAnalyze}
+              analyzePosition={engine.analyzePosition}
             />
           )}
         </div>
