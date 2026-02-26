@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from 'react';
 import { Chess, Square } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { TouchBackend } from 'react-dnd-touch-backend';
@@ -361,25 +367,101 @@ export function InteractiveBoard({
 
       {/* Sizing container — ResizeObserver measures this to set boardWidth */}
       <div ref={containerRef} className="board-sizer">
-        <Chessboard
-          id="chess-helper-board"
-          position={position}
-          onPieceDrop={makeMove}
-          boardWidth={boardWidth}
-          boardOrientation={boardOrientation}
-          animationDuration={150}
-          arePiecesDraggable={true}
-          customDndBackend={TouchBackend}
-          customDndBackendOptions={{ enableMouseEvents: true }}
-          onPromotionCheck={() => false}
-          customPieces={minimalPieces}
-          customBoardStyle={{
-            borderRadius: '4px',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
-          }}
-          customDarkSquareStyle={{ backgroundColor: '#6b7c8f' }}
-          customLightSquareStyle={{ backgroundColor: '#dce3eb' }}
-        />
+        {(() => {
+          const sq = boardWidth / 8;
+          const labelSize = Math.max(12, Math.floor(sq * 0.35));
+          const gutterWidth = labelSize + 4;
+          const innerBoardWidth = boardWidth - gutterWidth;
+          const innerSq = innerBoardWidth / 8;
+          const ranks = Array.from({ length: 8 }, (_, i) =>
+            boardOrientation === 'white' ? 8 - i : i + 1,
+          );
+          const files = Array.from({ length: 8 }, (_, i) =>
+            boardOrientation === 'white'
+              ? String.fromCharCode(97 + i)
+              : String.fromCharCode(104 - i),
+          );
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex' }}>
+                {/* Rank labels (left gutter) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    width: gutterWidth,
+                    flexShrink: 0,
+                  }}
+                >
+                  {ranks.map((rank, i) => (
+                    <div
+                      key={`rank-${i}`}
+                      style={{
+                        height: innerSq,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: labelSize,
+                        fontWeight: 700,
+                        color: 'var(--text-secondary)',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {rank}
+                    </div>
+                  ))}
+                </div>
+                {/* Board */}
+                <Chessboard
+                  id="chess-helper-board"
+                  position={position}
+                  onPieceDrop={makeMove}
+                  boardWidth={innerBoardWidth}
+                  boardOrientation={boardOrientation}
+                  animationDuration={150}
+                  arePiecesDraggable={true}
+                  customDndBackend={TouchBackend}
+                  customDndBackendOptions={{ enableMouseEvents: true }}
+                  onPromotionCheck={() => false}
+                  customPieces={minimalPieces}
+                  showBoardNotation={false}
+                  customBoardStyle={{
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+                  }}
+                  customDarkSquareStyle={{ backgroundColor: '#6b7c8f' }}
+                  customLightSquareStyle={{ backgroundColor: '#dce3eb' }}
+                />
+              </div>
+              {/* File labels (bottom gutter) */}
+              <div
+                style={{
+                  display: 'flex',
+                  marginLeft: gutterWidth,
+                  height: labelSize + 4,
+                }}
+              >
+                {files.map((file, i) => (
+                  <div
+                    key={`file-${i}`}
+                    style={{
+                      width: innerSq,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: labelSize,
+                      fontWeight: 700,
+                      color: 'var(--text-secondary)',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {file}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="board-moves" title={moveHistory.join(' ')}>
