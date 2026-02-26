@@ -185,6 +185,17 @@ export default function App(): React.ReactElement {
     [mode, requestBotMove],
   );
 
+  // ── Undo (coach mode) ──
+  const handleUndo = useCallback((restoredFen: string) => {
+    setCurrentFen(restoredFen);
+    setHint(null);
+    setMoveEvaluation(null);
+    setError(null);
+    setGameOver(false);
+    setIsBotThinking(false);
+    pendingHintRef.current = null;
+  }, []);
+
   // ── Reset ──
   const handleReset = useCallback(() => {
     setCurrentFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
@@ -317,6 +328,7 @@ export default function App(): React.ReactElement {
           mode={mode}
           onMoveMade={handleMoveMade}
           onReset={handleReset}
+          onUndo={handleUndo}
           onGameOver={handleGameOver}
           boardWidth={280}
           hint={hint}

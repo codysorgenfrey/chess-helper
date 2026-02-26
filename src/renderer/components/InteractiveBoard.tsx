@@ -36,6 +36,8 @@ interface InteractiveBoardProps {
   triggerBotMoveRef?: React.MutableRefObject<
     ((moveUci: string, moveSan: string) => void) | null
   >;
+  /** Called after an undo in coach mode with the restored FEN */
+  onUndo?: (restoredFen: string) => void;
 }
 
 /**
@@ -57,6 +59,7 @@ export function InteractiveBoard({
   playerColor = 'white',
   isBotThinking = false,
   triggerBotMoveRef,
+  onUndo,
 }: InteractiveBoardProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(280);
@@ -78,6 +81,8 @@ export function InteractiveBoard({
     'white',
   );
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
+  // Undo stack for coach mode — stores the FEN *before* each half-move
+  const [coachHistory, setCoachHistory] = useState<string[]>([]);
 
   // Free-placement position for modeler mode (FEN string)
   const [freePosition, setFreePosition] = useState(new Chess().fen());
@@ -106,6 +111,7 @@ export function InteractiveBoard({
             promotion: moveUci[4] || undefined,
           });
           if (move) {
+            setCoachHistory((prev) => [...prev, fenBefore]);
             setMoveHistory((prev) => [...prev, move.san]);
             const fenAfter = game.fen();
             const newGame = new Chess(fenAfter);
@@ -201,6 +207,7 @@ export function InteractiveBoard({
         });
 
         if (move) {
+          setCoachHistory((prev) => [...prev, fenBefore]);
           setMoveHistory((prev) => [...prev, move.san]);
           const fenAfter = game.fen();
           const newGame = new Chess(fenAfter);
@@ -254,24 +261,26 @@ export function InteractiveBoard({
         });
       }
     } else {
-      // Coach: undo 2 moves (bot + user) so it's the user's turn again
-      const move1 = game.undo();
-      if (move1) {
-        const move2 = game.undo();
-        if (move2) {
-          setMoveHistory((prev) => prev.slice(0, -2));
-        } else {
-          setMoveHistory((prev) => prev.slice(0, -1));
-        }
-        setGame(new Chess(game.fen()));
+      // Coach: undo 2 half-moves (bot + user) so it's the player's turn again.
+      // We use coachHistory (a FEN stack) because the game instance is always
+      // rebuilt from FEN via new Chess(fen) and therefore has no move history
+      // for game.undo() to walk back through.
+      const undoCount = coachHistory.length >= 2 ? 2 : coachHistory.length;
+      if (undoCount > 0) {
+        const restoredFen = coachHistory[coachHistory.length - undoCount];
+        setCoachHistory((prev) => prev.slice(0, -undoCount));
+        setMoveHistory((prev) => prev.slice(0, -undoCount));
+        setGame(new Chess(restoredFen));
+        onUndo?.(restoredFen);
       }
     }
-  }, [game, mode, freeHistory, freePosition, onMoveMade]);
+  }, [game, mode, freeHistory, freePosition, onMoveMade, onUndo, coachHistory]);
 
   const handleReset = useCallback(() => {
     const newGame = new Chess();
     setGame(newGame);
     setMoveHistory([]);
+    setCoachHistory([]);
     setFreePosition(newGame.fen());
     setFreeHistory([]);
     onReset?.();
@@ -303,6 +312,7 @@ export function InteractiveBoard({
     const newGame = new Chess();
     setGame(newGame);
     setMoveHistory([]);
+    setCoachHistory([]);
     setFreePosition(newGame.fen());
     setFreeHistory([]);
   }, [mode]);
