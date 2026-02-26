@@ -49,38 +49,75 @@ export function CoachingPanel({
   error,
   onDismissEvaluation,
 }: CoachingPanelProps): React.ReactElement {
-  // Show move evaluation if available (takes priority over hint)
-  if (moveEvaluation) {
-    const config = qualityConfig[moveEvaluation.quality];
+  // Build independent sections that compose together
+
+  const evalSection = moveEvaluation
+    ? (() => {
+        const config = qualityConfig[moveEvaluation.quality];
+        return (
+          <div className={`coaching-eval ${config.className}`}>
+            <div className="coaching-eval-header">
+              <span className="coaching-eval-icon">{config.icon}</span>
+              <span className="coaching-eval-label">{config.label}</span>
+              <span className="coaching-eval-move">
+                {moveEvaluation.userMoveSan}
+              </span>
+              <button
+                className="coaching-dismiss-btn"
+                onClick={onDismissEvaluation}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="coaching-eval-explanation">
+              {moveEvaluation.explanation}
+            </p>
+          </div>
+        );
+      })()
+    : null;
+
+  // Game over state — replaces the hint area entirely
+  if (gameOver) {
     return (
       <div className="coaching-panel">
-        <div className={`coaching-eval ${config.className}`}>
-          <div className="coaching-eval-header">
-            <span className="coaching-eval-icon">{config.icon}</span>
-            <span className="coaching-eval-label">{config.label}</span>
-            <span className="coaching-eval-move">
-              {moveEvaluation.userMoveSan}
-            </span>
-          </div>
-          <p className="coaching-eval-explanation">
-            {moveEvaluation.explanation}
-          </p>
+        {evalSection}
+        <div className="coaching-game-over">
+          <span className="coaching-game-over-icon">🏁</span>
+          <p>Game over! Reset the board to play again.</p>
         </div>
-        <button
-          className="coaching-dismiss-btn"
-          onClick={onDismissEvaluation}
-          title="Dismiss"
-        >
-          Continue playing
-        </button>
       </div>
     );
   }
 
-  // Show hint if available
-  if (hint) {
-    return (
-      <div className="coaching-panel">
+  // Error display
+  const errorSection = error ? (
+    <div className="coaching-error">
+      <span className="coaching-error-icon">⚠</span>
+      <p>{error}</p>
+    </div>
+  ) : null;
+
+  // Thinking / hint / hint-button section
+  let hintSection: React.ReactNode = null;
+  if (isThinking) {
+    hintSection = (
+      <div className="coaching-thinking">
+        <div className="coaching-spinner"></div>
+        <span>Analyzing position…</span>
+      </div>
+    );
+  } else if (isBotThinking) {
+    hintSection = (
+      <div className="coaching-thinking">
+        <div className="coaching-spinner"></div>
+        <span>Opponent is thinking…</span>
+      </div>
+    );
+  } else if (hint) {
+    hintSection = (
+      <>
         <div className="coaching-hint">
           <div className="coaching-hint-header">
             <span className="coaching-hint-icon">💡</span>
@@ -91,61 +128,10 @@ export function CoachingPanel({
         <p className="coaching-hint-subtext">
           Make your move — I'll tell you how it compares!
         </p>
-      </div>
+      </>
     );
-  }
-
-  // Show thinking state
-  if (isThinking) {
-    return (
-      <div className="coaching-panel">
-        <div className="coaching-thinking">
-          <div className="coaching-spinner"></div>
-          <span>Analyzing position…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Show bot thinking state
-  if (isBotThinking) {
-    return (
-      <div className="coaching-panel">
-        <div className="coaching-thinking">
-          <div className="coaching-spinner"></div>
-          <span>Opponent is thinking…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error if any
-  if (error) {
-    return (
-      <div className="coaching-panel">
-        <div className="coaching-error">
-          <span className="coaching-error-icon">⚠</span>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Game over state
-  if (gameOver) {
-    return (
-      <div className="coaching-panel">
-        <div className="coaching-game-over">
-          <span className="coaching-game-over-icon">🏁</span>
-          <p>Game over! Reset the board to play again.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Default: show hint button
-  return (
-    <div className="coaching-panel">
+  } else {
+    hintSection = (
       <div className="coaching-ready">
         <p className="coaching-prompt">Need help finding the best move?</p>
         <button
@@ -157,6 +143,14 @@ export function CoachingPanel({
           💡 Give me a hint
         </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="coaching-panel">
+      {evalSection}
+      {errorSection}
+      {hintSection}
     </div>
   );
 }

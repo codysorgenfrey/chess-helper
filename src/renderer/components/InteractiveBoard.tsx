@@ -95,6 +95,9 @@ export function InteractiveBoard({
   // Undo stack for modeler free mode
   const [freeHistory, setFreeHistory] = useState<string[]>([]);
 
+  // Click-to-move state
+  const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
+
   // Keep board orientation in sync with player color
   useEffect(() => {
     setBoardOrientation(playerColor);
@@ -147,6 +150,7 @@ export function InteractiveBoard({
   // Apply a user move via drag/drop
   const makeMove = useCallback(
     (sourceSquare: Square, targetSquare: Square, piece: string): boolean => {
+      setSelectedSquare(null);
       if (sourceSquare === targetSquare) return false;
 
       // ── Modeler mode: free placement (no rule enforcement) ──
@@ -250,7 +254,118 @@ export function InteractiveBoard({
     ],
   );
 
+  // ── Click-to-move ──
+  const handleSquareClick = useCallback(
+    (square: Square) => {
+      // Modeler mode: free placement
+      if (mode === 'modeler') {
+        if (selectedSquare) {
+          if (selectedSquare === square) {
+            setSelectedSquare(null);
+            return;
+          }
+          try {
+            const tempGame = new Chess(freePosition);
+            const piece = tempGame.get(selectedSquare);
+            if (piece) {
+              const pieceStr =
+                (piece.color === 'w' ? 'w' : 'b') + piece.type.toUpperCase();
+              makeMove(selectedSquare, square, pieceStr);
+            }
+          } catch {
+            // invalid position
+          }
+          setSelectedSquare(null);
+          return;
+        }
+        try {
+          const tempGame = new Chess(freePosition);
+          const piece = tempGame.get(square);
+          if (piece) setSelectedSquare(square);
+        } catch {
+          // invalid position
+        }
+        return;
+      }
+
+      // Coach mode
+      if (selectedSquare) {
+        if (selectedSquare === square) {
+          setSelectedSquare(null);
+          return;
+        }
+        const piece = game.get(selectedSquare);
+        if (piece) {
+          const pieceStr =
+            (piece.color === 'w' ? 'w' : 'b') + piece.type.toUpperCase();
+          const success = makeMove(selectedSquare, square, pieceStr);
+          if (success) return; // makeMove already cleared selection
+        }
+        // If clicked another friendly piece, select it
+        const clickedPiece = game.get(square);
+        if (clickedPiece && clickedPiece.color === game.turn()) {
+          setSelectedSquare(square);
+          return;
+        }
+        setSelectedSquare(null);
+        return;
+      }
+
+      // No selection — select a friendly piece
+      const sideToMove = game.turn();
+      const playerTurnChar = playerColor === 'white' ? 'w' : 'b';
+      if (sideToMove !== playerTurnChar || isBotThinking) return;
+
+      const piece = game.get(square);
+      if (piece && piece.color === sideToMove) {
+        setSelectedSquare(square);
+      }
+    },
+    [
+      selectedSquare,
+      game,
+      makeMove,
+      mode,
+      playerColor,
+      isBotThinking,
+      freePosition,
+    ],
+  );
+
+  // Highlight selected square and legal move targets
+  const squareStyles = useMemo(() => {
+    const styles: Record<string, React.CSSProperties> = {};
+    if (!selectedSquare) return styles;
+
+    styles[selectedSquare] = { backgroundColor: 'rgba(255, 255, 0, 0.4)' };
+
+    if (mode !== 'modeler') {
+      try {
+        const moves = game.moves({ square: selectedSquare, verbose: true });
+        for (const move of moves) {
+          const target = game.get(move.to as Square);
+          if (target) {
+            styles[move.to] = {
+              background:
+                'radial-gradient(transparent 51%, rgba(0,0,0,0.18) 51%)',
+            };
+          } else {
+            styles[move.to] = {
+              background:
+                'radial-gradient(circle, rgba(0,0,0,0.2) 25%, transparent 25%)',
+            };
+          }
+        }
+      } catch {
+        // position may be invalid
+      }
+    }
+
+    return styles;
+  }, [selectedSquare, game, moveHistory, mode]);
+
   const handleUndo = useCallback(() => {
+    setSelectedSquare(null);
     if (mode === 'modeler') {
       // Modeler free mode: pop from our undo stack
       if (freeHistory.length > 0) {
@@ -283,6 +398,7 @@ export function InteractiveBoard({
   }, [game, mode, freeHistory, freePosition, onMoveMade, onUndo, coachHistory]);
 
   const handleReset = useCallback(() => {
+    setSelectedSquare(null);
     const newGame = new Chess();
     setGame(newGame);
     setMoveHistory([]);
@@ -321,6 +437,7 @@ export function InteractiveBoard({
     setCoachHistory([]);
     setFreePosition(newGame.fen());
     setFreeHistory([]);
+    setSelectedSquare(null);
   }, [mode]);
 
   // Status text
@@ -416,6 +533,8 @@ export function InteractiveBoard({
                   id="chess-helper-board"
                   position={position}
                   onPieceDrop={makeMove}
+                  onSquareClick={handleSquareClick}
+                  customSquareStyles={squareStyles}
                   boardWidth={innerBoardWidth}
                   boardOrientation={boardOrientation}
                   animationDuration={150}

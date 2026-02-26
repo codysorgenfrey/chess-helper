@@ -38,7 +38,7 @@ export function StatusBar({
             aria-pressed={sideToMove === 'w'}
             title="White to move"
           >
-            ♔ W
+            <span className="color-icon color-icon--white" /> W
           </button>
           <button
             className={`side-btn ${sideToMove === 'b' ? 'side-btn--active' : ''}`}
@@ -46,7 +46,7 @@ export function StatusBar({
             aria-pressed={sideToMove === 'b'}
             title="Black to move"
           >
-            ♚ B
+            <span className="color-icon color-icon--black" /> B
           </button>
         </div>
 
