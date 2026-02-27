@@ -229,10 +229,6 @@ export default function App(): React.ReactElement {
     setPlayerColor(color);
   }, []);
 
-  const handleToggleAutoAnalyze = useCallback(() => {
-    setAutoAnalyze((v) => !v);
-  }, []);
-
   // On mount, if player is black the bot (white) needs to move first
   const hasFiredInitialBot = useRef(false);
   useEffect(() => {
@@ -285,6 +281,20 @@ export default function App(): React.ReactElement {
           🎓 Coach
         </button>
       </div>
+
+      {/* Modeler settings bar (only in modeler mode) */}
+      {mode === 'modeler' && (
+        <div className="settings-bar">
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={autoAnalyze}
+              onChange={() => setAutoAnalyze((v) => !v)}
+            />
+            <span className="settings-label">Auto-analyze</span>
+          </label>
+        </div>
+      )}
 
       {/* Coach settings bar (only in coach mode) */}
       {mode === 'coach' && (
@@ -389,7 +399,6 @@ export default function App(): React.ReactElement {
             <ModelerPanel
               currentFen={currentFen}
               autoAnalyze={autoAnalyze}
-              onToggleAutoAnalyze={handleToggleAutoAnalyze}
               analyzePosition={engine.analyzePosition}
             />
           )}

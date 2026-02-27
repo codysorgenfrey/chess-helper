@@ -1009,6 +1009,7 @@ kbd {
   align-items: center;
   justify-content: center;
   padding: 5px 10px;
+  min-height: 32px;
   background: rgba(0, 0, 0, 0.12);
   border-bottom: 1px solid var(--border);
   gap: 12px;
@@ -1283,8 +1284,8 @@ kbd {
   padding: 16px 14px;
 }
 
-/* ── Hint Button (default state) ── */
-.coaching-ready {
+/* ── Shared Panel Ready / Action Button ── */
+.panel-ready {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1292,13 +1293,15 @@ kbd {
   padding: 8px 0;
 }
 
-.coaching-prompt {
+.panel-prompt {
   font-size: 12px;
   color: var(--text-secondary);
   text-align: center;
+  line-height: 1.5;
+  max-width: 240px;
 }
 
-.coaching-hint-btn {
+.panel-action-btn {
   padding: 10px 24px;
   background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
   color: white;
@@ -1312,16 +1315,16 @@ kbd {
   box-shadow: 0 2px 12px rgba(91, 138, 240, 0.3);
 }
 
-.coaching-hint-btn:hover {
+.panel-action-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(91, 138, 240, 0.45);
 }
 
-.coaching-hint-btn:active {
+.panel-action-btn:active {
   transform: translateY(0);
 }
 
-.coaching-hint-btn:disabled {
+.panel-action-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
@@ -1565,57 +1568,7 @@ kbd {
   padding: 10px 12px;
 }
 
-/* ── Controls ── */
-.modeler-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
-.modeler-analyze-btn {
-  flex: 1;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(91, 138, 240, 0.25);
-}
-
-.modeler-analyze-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 3px 14px rgba(91, 138, 240, 0.4);
-}
-
-.modeler-analyze-btn:active {
-  transform: translateY(0);
-}
-
-.modeler-analyze-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.modeler-auto-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.modeler-auto-toggle input[type='checkbox'] {
-  accent-color: var(--accent-blue);
-  cursor: pointer;
-}
 
 /* ── Thinking ── */
 .modeler-thinking {
@@ -1804,21 +1757,7 @@ kbd {
   color: var(--text-muted);
 }
 
-/* ── Empty state ── */
-.modeler-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 16px;
-  text-align: center;
-}
 
-.modeler-empty p {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  max-width: 240px;
-}
 
 /* ========================================
    Responsive Two-Column Layout

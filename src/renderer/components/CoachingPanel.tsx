@@ -132,10 +132,10 @@ export function CoachingPanel({
     );
   } else {
     hintSection = (
-      <div className="coaching-ready">
-        <p className="coaching-prompt">Need help finding the best move?</p>
+      <div className="panel-ready">
+        <p className="panel-prompt">Need help finding the best move?</p>
         <button
-          className="coaching-hint-btn"
+          className="panel-action-btn"
           onClick={onRequestHint}
           disabled={!canRequestHint}
           title="Get a coaching hint"
