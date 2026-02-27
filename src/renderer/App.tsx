@@ -59,6 +59,9 @@ export default function App(): React.ReactElement {
   // ── Modeler mode state ──
   const [autoAnalyze, setAutoAnalyze] = useState(false);
 
+  // ── Focus mode (hides chrome on mobile) ──
+  const [focusMode, setFocusMode] = useState(false);
+
   const pendingHintRef = useRef<HintResult | null>(null);
   const currentFenRef = useRef(currentFen);
   currentFenRef.current = currentFen;
@@ -367,7 +370,7 @@ export default function App(): React.ReactElement {
   const isPlayerTurn = sideToMove === playerColor;
 
   return (
-    <div className="app-container">
+    <div className={`app-container${focusMode ? ' focus-mode' : ''}`}>
       {/* Title bar */}
       <div className="title-bar">
         <span className="title-icon">♟</span>
@@ -482,6 +485,8 @@ export default function App(): React.ReactElement {
             playerColor={playerColor}
             isBotThinking={isBotThinking}
             triggerBotMoveRef={triggerBotMoveRef}
+            focusMode={focusMode}
+            onToggleFocusMode={() => setFocusMode((v) => !v)}
           />
 
           {/* FEN input — shown below board on mobile, inline on desktop */}

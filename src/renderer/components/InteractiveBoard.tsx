@@ -44,6 +44,10 @@ interface InteractiveBoardProps {
   >;
   /** Called after an undo in coach mode with the restored FEN */
   onUndo?: (restoredFen: string) => void;
+  /** Whether focus mode is active (hides app chrome) */
+  focusMode?: boolean;
+  /** Toggle focus mode */
+  onToggleFocusMode?: () => void;
 }
 
 /**
@@ -66,6 +70,8 @@ export function InteractiveBoard({
   isBotThinking = false,
   triggerBotMoveRef,
   onUndo,
+  focusMode = false,
+  onToggleFocusMode,
 }: InteractiveBoardProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const [boardWidth, setBoardWidth] = useState(280);
@@ -480,6 +486,47 @@ export function InteractiveBoard({
         >
           ↻
         </button>
+        {onToggleFocusMode && (
+          <button
+            className={`board-btn board-btn--focus${focusMode ? ' board-btn--focus-active' : ''}`}
+            onClick={onToggleFocusMode}
+            title={focusMode ? 'Exit focus mode' : 'Focus mode'}
+          >
+            {focusMode ? (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="9,1 13,1 13,5" />
+                <line x1="13" y1="1" x2="8.5" y2="5.5" />
+                <polyline points="5,13 1,13 1,9" />
+                <line x1="1" y1="13" x2="5.5" y2="8.5" />
+              </svg>
+            ) : (
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="1,5 1,1 5,1" />
+                <line x1="1" y1="1" x2="5.5" y2="5.5" />
+                <polyline points="13,9 13,13 9,13" />
+                <line x1="13" y1="13" x2="8.5" y2="8.5" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Sizing container — ResizeObserver measures this to set boardWidth */}

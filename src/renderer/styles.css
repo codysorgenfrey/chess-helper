@@ -2050,25 +2050,40 @@ kbd {
   min-height: 0;
 }
 
-/* Mobile: stack vertically */
+/* Mobile: split-screen — board top, chat bottom, no page scroll */
 @media (max-width: 680px) {
   .app-container {
-    height: auto;
-    min-height: 100dvh;
-    overflow-y: auto;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .app-main {
     flex-direction: column;
-    padding: 8px 8px 24px;
-    gap: 8px;
+    padding: 4px 4px 0;
+    gap: 4px;
     max-width: 100%;
-    flex: none;
+    flex: 1;
+    min-height: 0;
+    /* allow flex children to shrink */
+    overflow: hidden;
   }
 
   .app-board-col {
     width: 100%;
     min-width: unset;
+    flex: 0 0 auto;
+    /* size to content, don't grow */
+  }
+
+  /*
+   * The board is square — constraining WIDTH limits height too.
+   * 42dvh leaves ~58% of the screen for controls + chat panel.
+   * The ResizeObserver reads this container's width so the board
+   * renders at the right pixel size automatically.
+   */
+  .app-board-col .board-sizer {
+    max-width: min(100%, 42dvh);
+    margin: 0 auto;
   }
 
   .app-panel-col {
@@ -2076,17 +2091,28 @@ kbd {
     max-width: 100%;
     padding-left: 0;
     min-width: unset;
-    overflow: visible;
+    flex: 1 1 0;
+    /* fill remaining space */
+    min-height: 0;
+    overflow: hidden;
   }
 
   .chat-panel {
-    min-height: 300px;
-    max-height: 50vh;
+    min-height: 0;
+    max-height: none;
+    height: 100%;
   }
 
   .chat-messages {
     min-height: 0;
     max-height: none;
+    flex: 1;
+  }
+
+  .chat-input-area {
+    padding: 6px 8px;
+    /* add safe-area inset for phones with home indicator */
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
   }
 }
 
@@ -2098,5 +2124,29 @@ kbd {
 
   .app-board-col {
     width: min(380px, 50%);
+  }
+}
+
+/* ========================================
+   Focus-mode board button
+   ======================================== */
+.board-btn--focus-active {
+  color: var(--accent-blue);
+  border-color: rgba(91, 138, 240, 0.35);
+}
+
+/* ========================================
+   Focus Mode — hide chrome, expand board
+   ======================================== */
+.focus-mode .title-bar,
+.focus-mode .mode-tabs,
+.focus-mode .settings-bar {
+  display: none;
+}
+
+/* On mobile, give the board more room once chrome is hidden */
+@media (max-width: 680px) {
+  .focus-mode .app-board-col .board-sizer {
+    max-width: min(100%, 54dvh);
   }
 }
