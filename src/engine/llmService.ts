@@ -161,3 +161,44 @@ Explain this move to me.`,
 
   return chatCompletion(messages, 300);
 }
+
+/**
+ * Continue a conversation about a chess position.
+ * Sends the user's follow-up question along with prior conversation context.
+ */
+export async function chatFollowUp(
+  question: string,
+  fen: string,
+  conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string> {
+  const moveNumber = parseInt(fen.split(' ')[5] || '1');
+  const phase =
+    moveNumber <= 10 ? 'opening' : moveNumber <= 25 ? 'middlegame' : 'endgame';
+  const sideToMove = fen.split(' ')[1] === 'w' ? 'White' : 'Black';
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: `You are a friendly, expert chess coach having a conversation with a student. The current position is in the ${phase} phase, and it is ${sideToMove} to move.
+
+FEN: ${fen}
+
+RULES:
+- Answer the student's chess questions clearly and helpfully.
+- You may use standard chess notation (like Nf3, Bxe5) when referring to specific moves.
+- Be encouraging and instructive.
+- Keep answers concise (2-5 sentences) unless the student asks for more detail.
+- If the question is not about chess, politely redirect to chess topics.`,
+    },
+    ...conversationHistory.map((msg) => ({
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+    })),
+    {
+      role: 'user' as const,
+      content: question,
+    },
+  ];
+
+  return chatCompletion(messages, 400);
+}

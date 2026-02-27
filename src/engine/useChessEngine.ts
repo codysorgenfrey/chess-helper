@@ -19,7 +19,11 @@ import {
   BotDifficulty,
   StatusUpdate,
 } from '../shared/types';
-import { generateLLMHint, generateLLMExplanation } from './llmService';
+import {
+  generateLLMHint,
+  generateLLMExplanation,
+  chatFollowUp,
+} from './llmService';
 
 // ── Settings (replaces electron-store) ──────────────────────────────────────
 
@@ -264,6 +268,12 @@ export interface ChessEngineAPI {
     moveUci: string,
     moveSan: string,
   ) => Promise<MoveEvaluation | { error: string }>;
+  explainMove: (evaluation: MoveEvaluation, fen: string) => Promise<string>;
+  askFollowUp: (
+    question: string,
+    fen: string,
+    conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+  ) => Promise<string>;
   getBotMove: (
     fen: string,
     difficulty: BotDifficulty,
@@ -400,19 +410,6 @@ export function useChessEngine(): ChessEngineAPI {
 
         const quality = classifyMoveQuality(centipawnLoss);
 
-        sendStatus('analyzing', 'Asking AI coach…');
-        const explanation = await generateLLMExplanation(
-          fen,
-          moveSan,
-          bestMove.san || bestMove.uci,
-          quality,
-          centipawnLoss,
-          bestMove.scoreCp,
-          bestMove.mateIn,
-          userScoreCp,
-          userMateIn,
-        );
-
         sendStatus('done', `Move evaluated: ${quality}`);
         return {
           userMoveSan: moveSan,
@@ -424,7 +421,7 @@ export function useChessEngine(): ChessEngineAPI {
           bestMoveScoreCp: bestMove.scoreCp,
           bestMoveMateIn: bestMove.mateIn,
           quality,
-          explanation,
+          explanation: '',
           centipawnLoss,
         };
       } catch (err) {
@@ -541,11 +538,63 @@ export function useChessEngine(): ChessEngineAPI {
     [sendStatus],
   );
 
+  // ── explainMove (on-demand LLM explanation) ────────────────────────────────
+
+  const explainMove = useCallback(
+    async (evaluation: MoveEvaluation, fen: string): Promise<string> => {
+      sendStatus('analyzing', 'Asking AI coach…');
+      try {
+        const explanation = await generateLLMExplanation(
+          fen,
+          evaluation.userMoveSan,
+          evaluation.bestMoveSan,
+          evaluation.quality,
+          evaluation.centipawnLoss,
+          evaluation.bestMoveScoreCp,
+          evaluation.bestMoveMateIn,
+          evaluation.userMoveScoreCp,
+          evaluation.userMoveMateIn,
+        );
+        sendStatus('done', 'Explanation ready');
+        return explanation;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendStatus('error', 'Explanation failed');
+        throw new Error(msg);
+      }
+    },
+    [sendStatus],
+  );
+
+  // ── askFollowUp (chat with LLM) ───────────────────────────────────────────
+
+  const askFollowUp = useCallback(
+    async (
+      question: string,
+      fen: string,
+      conversationHistory: { role: 'user' | 'assistant'; content: string }[],
+    ): Promise<string> => {
+      sendStatus('analyzing', 'Thinking…');
+      try {
+        const answer = await chatFollowUp(question, fen, conversationHistory);
+        sendStatus('done', 'Response ready');
+        return answer;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendStatus('error', 'Follow-up failed');
+        throw new Error(msg);
+      }
+    },
+    [sendStatus],
+  );
+
   return {
     isReady,
     statusUpdate,
     getHint,
     evaluateMove,
+    explainMove,
+    askFollowUp,
     getBotMove,
     analyzePosition,
   };
