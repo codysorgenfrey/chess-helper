@@ -19,6 +19,7 @@ import {
   BotDifficulty,
   StatusUpdate,
 } from '../shared/types';
+import { generateLLMHint, generateLLMExplanation } from './llmService';
 
 // ── Settings (replaces electron-store) ──────────────────────────────────────
 
@@ -164,158 +165,6 @@ function detectThemes(fen: string, move: EngineMove): string[] {
   return themes;
 }
 
-// ── Coaching hint generator (from ipc-handlers.ts) ───────────────────────────
-
-function generateCoachingHint(
-  move: EngineMove,
-  fen: string,
-  allMoves: EngineMove[],
-): string {
-  const san = move.san || '';
-  const uci = move.uci || '';
-  const scoreCp = move.scoreCp ?? 0;
-
-  const isCapture = san.includes('x');
-  const isCheck = san.includes('+');
-  const isMate =
-    san.includes('#') ||
-    (move.mateIn !== null && move.mateIn > 0 && move.mateIn <= 5);
-  const isCastle = san === 'O-O' || san === 'O-O-O';
-  const isPromotion = san.includes('=');
-
-  const pieceChar = san[0];
-  const pieceNames: Record<string, string> = {
-    K: 'king',
-    Q: 'queen',
-    R: 'rook',
-    B: 'bishop',
-    N: 'knight',
-  };
-  const isPawnMove = pieceChar === pieceChar.toLowerCase() && !isCastle;
-  const pieceName = isPawnMove ? 'pawn' : pieceNames[pieceChar] || 'piece';
-
-  const targetSquare = uci.slice(2, 4);
-  const targetFile = targetSquare[0];
-  const fileZone = 'abc'.includes(targetFile)
-    ? 'queenside'
-    : 'fgh'.includes(targetFile)
-      ? 'kingside'
-      : 'center';
-
-  const themes = detectThemes(fen, move);
-
-  const secondBestCp =
-    allMoves.length > 1 ? (allMoves[1].scoreCp ?? 0) : scoreCp;
-  const evalGap = scoreCp - secondBestCp;
-  const isOnly = evalGap > 150;
-
-  const moveNumber = parseInt(fen.split(' ')[5] || '1');
-  const phase =
-    moveNumber <= 10 ? 'opening' : moveNumber <= 25 ? 'middlegame' : 'endgame';
-
-  const parts: string[] = [];
-
-  if (isMate) {
-    parts.push(
-      "There's a forced checkmate! Carefully examine all checks and look at how your opponent's king is trapped.",
-    );
-    if (move.mateIn !== null && move.mateIn > 1) {
-      parts.push(
-        `It's a mate in ${move.mateIn} — follow the sequence of forcing moves.`,
-      );
-    }
-    return parts.join(' ');
-  }
-
-  if (isOnly) {
-    parts.push(
-      "There's really only one good move here — the alternatives are significantly worse.",
-    );
-  }
-
-  if (phase === 'opening') {
-    if (isCastle) {
-      parts.push(
-        'In the opening, king safety is paramount. Think about castling to protect your king and activate your rook.',
-      );
-    } else if (isPawnMove) {
-      parts.push(
-        'Opening principle: control the center with pawns, then develop your pieces. Which pawn advances help you claim central space?',
-      );
-    } else if (pieceName === 'knight' || pieceName === 'bishop') {
-      parts.push(
-        "Opening principle: develop your minor pieces toward active squares that influence the center. Which piece hasn't moved yet?",
-      );
-    } else {
-      parts.push(
-        'Think about opening principles: center control, piece development, and king safety.',
-      );
-    }
-  } else if (phase === 'middlegame') {
-    if (isCapture && isCheck) {
-      parts.push(
-        "Look for a tactical combination — can you win material while also giving check? That's a powerful combination because your opponent is forced to deal with the check first.",
-      );
-    } else if (isCapture) {
-      parts.push(
-        `There's a tactical opportunity. Look at the ${fileZone} and consider: are any of your opponent's pieces undefended or overloaded?`,
-      );
-    } else if (isCheck) {
-      parts.push(
-        "Look for a forcing check. Checks are powerful because they limit your opponent's options. Think about which piece can deliver check and what that achieves.",
-      );
-    } else if (scoreCp > 200) {
-      parts.push(
-        `You have a strong advantage. Look for ways to increase pressure. Think about: which of your pieces isn't doing enough work on the ${fileZone}?`,
-      );
-    } else if (scoreCp < -100) {
-      parts.push(
-        "You're under pressure. Look for defensive resources — can you create counterplay or simplify the position?",
-      );
-    } else {
-      parts.push(
-        `Think about piece activity — your ${pieceName} could be more effective. Where can it exert maximum influence on the ${fileZone}?`,
-      );
-    }
-  } else {
-    // endgame
-    if (isPawnMove) {
-      parts.push(
-        'In the endgame, passed pawns are extremely powerful. Think about advancing your pawns toward promotion — every tempo matters.',
-      );
-    } else if (pieceName === 'king') {
-      parts.push(
-        'In the endgame, the king becomes a fighting piece. Centralize your king and use it actively.',
-      );
-    } else {
-      parts.push(
-        'Endgame principle: activate your pieces, advance passed pawns, and keep your king centralized. Think about the pawn structure.',
-      );
-    }
-  }
-
-  const relevantThemes = themes
-    .filter((t) => !t.includes('checkmate') || !isMate)
-    .slice(0, 2);
-  if (relevantThemes.length > 0) {
-    parts.push(relevantThemes.join('. ') + '.');
-  }
-
-  if (isPromotion) {
-    parts.push(
-      'One of your pawns can promote! Can you safely push it to the back rank?',
-    );
-  }
-
-  if (move.pv && move.pv.length >= 4 && !isMate) {
-    parts.push(
-      "Try to think a few moves ahead — if you play the best move, how will your opponent respond, and what's your follow-up?",
-    );
-  }
-
-  return parts.join(' ');
-}
-
 // ── Move description for modeler (from ipc-handlers.ts) ──────────────────────
 
 function describeMoveForModeler(move: EngineMove, fen: string): string {
@@ -404,187 +253,6 @@ function classifyMoveQuality(centipawnLoss: number): MoveQuality {
   return 'blunder';
 }
 
-// ── Explanation builder (from ipc-handlers.ts) ───────────────────────────────
-
-function buildExplanation(
-  quality: MoveQuality,
-  userMoveSan: string,
-  bestMoveSan: string,
-  centipawnLoss: number,
-  bestScoreCp: number | null,
-  bestMateIn: number | null,
-  userScoreCp: number | null,
-  userMateIn: number | null,
-  fen: string,
-  _userMoveUci: string,
-  _bestMoveUci: string,
-): string {
-  const parts: string[] = [];
-
-  const bestEvalStr =
-    bestMateIn !== null
-      ? `mate in ${Math.abs(bestMateIn)}`
-      : bestScoreCp !== null
-        ? `${(bestScoreCp / 100).toFixed(1)}`
-        : '?';
-
-  const userEvalStr =
-    userMateIn !== null
-      ? `mate in ${Math.abs(userMateIn)}`
-      : userScoreCp !== null
-        ? `${(userScoreCp / 100).toFixed(1)}`
-        : '?';
-
-  const lossStr = (centipawnLoss / 100).toFixed(1);
-
-  const bestPieceChar = bestMoveSan[0];
-  const pieceNames: Record<string, string> = {
-    K: 'king',
-    Q: 'queen',
-    R: 'rook',
-    B: 'bishop',
-    N: 'knight',
-  };
-  const userIsCapture = userMoveSan.includes('x');
-  const bestIsCapture = bestMoveSan.includes('x');
-  const userIsCheck = userMoveSan.includes('+') || userMoveSan.includes('#');
-  const bestIsCheck = bestMoveSan.includes('+') || bestMoveSan.includes('#');
-  const bestIsCastle = bestMoveSan === 'O-O' || bestMoveSan === 'O-O-O';
-
-  const moveNumber = parseInt(fen.split(' ')[5] || '1');
-  const phase =
-    moveNumber <= 10 ? 'opening' : moveNumber <= 25 ? 'middlegame' : 'endgame';
-
-  if (quality === 'best') {
-    parts.push(`Excellent! ${userMoveSan} is the engine's top choice.`);
-    if (userIsCapture && userIsCheck) {
-      parts.push(
-        'You found the key tactic — capturing with check forces your opponent to respond to the threat while you win material.',
-      );
-    } else if (userIsCheck) {
-      parts.push(
-        "This check creates a strong initiative. Forcing moves like checks limit your opponent's options.",
-      );
-    } else if (userIsCapture) {
-      parts.push(
-        'Good eye! You spotted the right capture when it was available.',
-      );
-    } else if (userMoveSan === 'O-O' || userMoveSan === 'O-O-O') {
-      parts.push(
-        'Good decision to castle. King safety is crucial, and you connected your rooks.',
-      );
-    } else if (phase === 'opening') {
-      parts.push(
-        'You followed opening principles well — developing pieces and controlling the center.',
-      );
-    } else if (phase === 'endgame') {
-      parts.push(
-        'Well played. In the endgame, precision matters and you found the right move.',
-      );
-    } else {
-      parts.push('You identified the strongest continuation in this position.');
-    }
-    if (userScoreCp !== null) {
-      if (userScoreCp > 300) {
-        parts.push(
-          'You have a winning advantage — stay focused and convert it safely.',
-        );
-      } else if (userScoreCp > 100) {
-        parts.push(
-          'You have a clear advantage. Keep pressing while avoiding unnecessary complications.',
-        );
-      } else if (userScoreCp > -50) {
-        parts.push(
-          'The position is roughly equal. Keep looking for small improvements.',
-        );
-      }
-    }
-    return parts.join(' ');
-  }
-
-  if (quality === 'excellent') {
-    parts.push(
-      `${userMoveSan} is nearly perfect — very close to the best move ${bestMoveSan} (eval ${bestEvalStr}).`,
-    );
-    parts.push(`The difference of ${lossStr} pawns is minimal.`);
-  } else if (quality === 'good') {
-    parts.push(
-      `${userMoveSan} is solid but ${bestMoveSan} was stronger (eval ${bestEvalStr} vs your ${userEvalStr}).`,
-    );
-  } else if (quality === 'inaccuracy') {
-    parts.push(
-      `${userMoveSan} is an inaccuracy, losing about ${lossStr} pawns of advantage.`,
-    );
-    parts.push(`The best move was ${bestMoveSan} (eval ${bestEvalStr}).`);
-  } else if (quality === 'mistake') {
-    parts.push(`${userMoveSan} is a mistake, costing about ${lossStr} pawns.`);
-    parts.push(`${bestMoveSan} was much better (eval ${bestEvalStr}).`);
-  } else if (quality === 'blunder') {
-    parts.push(
-      `${userMoveSan} is a serious blunder! You lost ${lossStr} pawns of advantage.`,
-    );
-    parts.push(`${bestMoveSan} was the move to find (eval ${bestEvalStr}).`);
-  }
-
-  if (quality !== 'excellent') {
-    if (bestMateIn !== null && bestMateIn > 0) {
-      parts.push(
-        `You missed a forced checkmate in ${bestMateIn}. Look for all checks and captures — forcing moves come first!`,
-      );
-    } else if (bestIsCheck && !userIsCheck) {
-      parts.push(
-        "The best move gives check, which is a forcing move. Always consider checks first — they limit your opponent's responses.",
-      );
-    } else if (bestIsCapture && !userIsCapture) {
-      parts.push(
-        'The best move captures material. Before making a quiet move, ask yourself: are there any captures available that improve my position?',
-      );
-    } else if (bestIsCastle) {
-      parts.push(
-        'The best move was castling. In this position, king safety was more important than the move you played.',
-      );
-    } else if (!bestIsCapture && !bestIsCheck) {
-      const bestPieceName =
-        pieceNames[bestPieceChar] ||
-        (bestPieceChar === bestPieceChar.toLowerCase() ? 'pawn' : 'piece');
-      parts.push(
-        `The best move improves the ${bestPieceName}'s position. Sometimes the strongest moves aren't captures — they prepare future threats.`,
-      );
-    }
-  }
-
-  if (quality === 'mistake' || quality === 'blunder') {
-    if (userIsCapture && !bestIsCapture) {
-      parts.push(
-        "Grabbing material isn't always best — sometimes your opponent left that piece hanging to lure you into a worse position. Think about what your opponent's plan is.",
-      );
-    } else if (!userIsCapture && !userIsCheck) {
-      parts.push(
-        'Before committing to a quiet move, use this checklist: (1) Are my pieces safe? (2) Does my opponent have threats? (3) Are there any tactics I can use?',
-      );
-    }
-    if (phase === 'endgame') {
-      parts.push(
-        'In the endgame, every move counts. Think about pawn promotion, king activity, and piece coordination.',
-      );
-    }
-  }
-
-  if (quality === 'inaccuracy') {
-    if (phase === 'opening') {
-      parts.push(
-        'In the opening, focus on: center control, piece development, king safety. Ask — does my move help any of these?',
-      );
-    } else {
-      parts.push(
-        'Ask yourself before each move: what is my opponent threatening, and what does my move accomplish?',
-      );
-    }
-  }
-
-  return parts.join(' ');
-}
-
 // ── Hook return type ─────────────────────────────────────────────────────────
 
 export interface ChessEngineAPI {
@@ -662,9 +330,22 @@ export function useChessEngine(): ChessEngineAPI {
           sendStatus('done', 'No moves available');
           return { error: 'No legal moves in this position' };
         }
-        const coachingHint = generateCoachingHint(moves[0], fen, moves);
+
+        const best = moves[0];
+
+        sendStatus('analyzing', 'Asking AI coach…');
+        const coachingHint = await generateLLMHint(
+          fen,
+          best.san || best.uci,
+          best.uci,
+          best.scoreCp,
+          best.mateIn,
+          best.pv || [],
+          moves.map((m) => m.san || m.uci),
+        );
+
         sendStatus('done', 'Hint ready');
-        return { bestMove: moves[0], fen, coachingHint };
+        return { bestMove: best, fen, coachingHint };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         sendStatus('error', 'Hint failed');
@@ -718,18 +399,18 @@ export function useChessEngine(): ChessEngineAPI {
         }
 
         const quality = classifyMoveQuality(centipawnLoss);
-        const explanation = buildExplanation(
-          quality,
+
+        sendStatus('analyzing', 'Asking AI coach…');
+        const explanation = await generateLLMExplanation(
+          fen,
           moveSan,
           bestMove.san || bestMove.uci,
+          quality,
           centipawnLoss,
           bestMove.scoreCp,
           bestMove.mateIn,
           userScoreCp,
           userMateIn,
-          fen,
-          moveUci,
-          bestMove.uci,
         );
 
         sendStatus('done', `Move evaluated: ${quality}`);

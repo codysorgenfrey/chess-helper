@@ -1015,6 +1015,7 @@ kbd {
   flex-shrink: 0;
   width: 100%;
   box-sizing: border-box;
+  position: relative;
 }
 
 .settings-label {
@@ -1888,4 +1889,6 @@ kbd {
   .app-board-col {
     width: min(380px, 50%);
   }
+}
+
 }
