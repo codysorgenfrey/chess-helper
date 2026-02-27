@@ -269,16 +269,16 @@ export default function App(): React.ReactElement {
       {/* Mode tabs */}
       <div className="mode-tabs">
         <button
-          className={`mode-tab ${mode === 'modeler' ? 'mode-tab--active' : ''}`}
-          onClick={() => handleModeChange('modeler')}
-        >
-          🔍 Modeler
-        </button>
-        <button
           className={`mode-tab ${mode === 'coach' ? 'mode-tab--active' : ''}`}
           onClick={() => handleModeChange('coach')}
         >
           🎓 Coach
+        </button>
+        <button
+          className={`mode-tab ${mode === 'modeler' ? 'mode-tab--active' : ''}`}
+          onClick={() => handleModeChange('modeler')}
+        >
+          🔍 Modeler
         </button>
       </div>
 
