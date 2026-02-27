@@ -418,23 +418,6 @@ export function InteractiveBoard({
     setBoardOrientation((prev) => (prev === 'white' ? 'black' : 'white'));
   }, []);
 
-  // Format recent moves for display
-  const recentMoves = useMemo(() => {
-    if (moveHistory.length === 0) return 'Starting position';
-    const last6 = moveHistory.slice(-6);
-    const startIdx = moveHistory.length - last6.length;
-    const parts: string[] = [];
-    for (let i = 0; i < last6.length; i++) {
-      const globalIdx = startIdx + i;
-      if (globalIdx % 2 === 0) {
-        parts.push(`${Math.floor(globalIdx / 2) + 1}.${last6[i]}`);
-      } else {
-        parts.push(last6[i]);
-      }
-    }
-    return parts.join(' ');
-  }, [moveHistory]);
-
   // Reset when mode changes
   useEffect(() => {
     const newGame = new Chess();
@@ -628,10 +611,6 @@ export function InteractiveBoard({
             </div>
           );
         })()}
-      </div>
-
-      <div className="board-moves" title={moveHistory.join(' ')}>
-        {recentMoves}
       </div>
     </div>
   );
