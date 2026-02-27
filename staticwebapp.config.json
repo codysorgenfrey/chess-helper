@@ -4,6 +4,7 @@
     "Cross-Origin-Embedder-Policy": "require-corp"
   },
   "navigationFallback": {
-    "rewrite": "/index.html"
+    "rewrite": "/index.html",
+    "exclude": ["/api/*"]
   }
 }

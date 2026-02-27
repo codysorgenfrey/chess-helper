@@ -6,8 +6,6 @@ interface ModelerPanelProps {
   currentFen: string;
   /** Whether auto-analyze is enabled (analyze after each move) */
   autoAnalyze: boolean;
-  /** Toggle auto-analyze on/off */
-  onToggleAutoAnalyze: () => void;
   /** Analyze a position — provided by useChessEngine hook */
   analyzePosition: (fen: string) => Promise<PositionAnalysis>;
 }
@@ -38,7 +36,6 @@ function formatEval(move: AnalyzedMove): { text: string; className: string } {
 export function ModelerPanel({
   currentFen,
   autoAnalyze,
-  onToggleAutoAnalyze,
   analyzePosition,
 }: ModelerPanelProps): React.ReactElement {
   const [analysis, setAnalysis] = useState<PositionAnalysis | null>(null);
@@ -82,25 +79,6 @@ export function ModelerPanel({
 
   return (
     <div className="modeler-panel">
-      {/* Controls */}
-      <div className="modeler-controls">
-        <button
-          className="modeler-analyze-btn"
-          onClick={handleManualAnalyze}
-          disabled={isAnalyzing}
-        >
-          {isAnalyzing ? '⏳ Analyzing…' : '🔍 Analyze Position'}
-        </button>
-        <label className="modeler-auto-toggle">
-          <input
-            type="checkbox"
-            checked={autoAnalyze}
-            onChange={onToggleAutoAnalyze}
-          />
-          <span>Auto</span>
-        </label>
-      </div>
-
       {/* Analysis spinner */}
       {isAnalyzing && (
         <div className="modeler-thinking">
@@ -172,13 +150,33 @@ export function ModelerPanel({
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty / ready state */}
       {!analysis && !isAnalyzing && (
-        <div className="modeler-empty">
-          <p>
+        <div className="panel-ready">
+          <p className="panel-prompt">
             Set up a position on the board, then analyze to see the best moves
             with explanations.
           </p>
+          <button
+            className="panel-action-btn"
+            onClick={handleManualAnalyze}
+            disabled={isAnalyzing}
+          >
+            🔍 Analyze Position
+          </button>
+        </div>
+      )}
+
+      {/* Analyze button when results are shown */}
+      {analysis && !isAnalyzing && (
+        <div className="panel-ready">
+          <button
+            className="panel-action-btn"
+            onClick={handleManualAnalyze}
+            disabled={isAnalyzing}
+          >
+            🔍 Re-analyze
+          </button>
         </div>
       )}
     </div>
