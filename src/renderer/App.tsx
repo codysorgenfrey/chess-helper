@@ -58,6 +58,9 @@ export default function App(): React.ReactElement {
 
   // ── Modeler mode state ──
   const [autoAnalyze, setAutoAnalyze] = useState(false);
+  const [solveForColor, setSolveForColor] = useState<'white' | 'black'>(
+    'white',
+  );
 
   // ── Focus mode (hides chrome on mobile) ──
   const [focusMode, setFocusMode] = useState(false);
@@ -419,6 +422,25 @@ export default function App(): React.ReactElement {
       {/* Modeler settings bar (only in modeler mode) */}
       {mode === 'modeler' && (
         <div className="settings-bar">
+          <div className="color-selector">
+            <span className="settings-label">Solve for</span>
+            <div className="color-buttons">
+              <button
+                className={`color-btn ${solveForColor === 'white' ? 'color-btn--active' : ''}`}
+                onClick={() => setSolveForColor('white')}
+                title="Solve for White"
+              >
+                <span className="color-icon color-icon--white" />
+              </button>
+              <button
+                className={`color-btn ${solveForColor === 'black' ? 'color-btn--active' : ''}`}
+                onClick={() => setSolveForColor('black')}
+                title="Solve for Black"
+              >
+                <span className="color-icon color-icon--black" />
+              </button>
+            </div>
+          </div>
           <label className="settings-toggle">
             <input
               type="checkbox"
@@ -536,6 +558,7 @@ export default function App(): React.ReactElement {
               currentFen={currentFen}
               autoAnalyze={autoAnalyze}
               analyzePosition={engine.analyzePosition}
+              solveForColor={solveForColor}
             />
           )}
         </div>

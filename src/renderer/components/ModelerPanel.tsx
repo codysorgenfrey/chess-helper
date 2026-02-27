@@ -8,6 +8,8 @@ interface ModelerPanelProps {
   autoAnalyze: boolean;
   /** Analyze a position — provided by useChessEngine hook */
   analyzePosition: (fen: string) => Promise<PositionAnalysis>;
+  /** Which color to solve for (adjusts FEN active color before analysis) */
+  solveForColor: 'white' | 'black';
 }
 
 function formatEval(move: AnalyzedMove): { text: string; className: string } {
@@ -33,32 +35,53 @@ function formatEval(move: AnalyzedMove): { text: string; className: string } {
   return { text, className: 'modeler-eval--losing' };
 }
 
+/** Swap the active color in a FEN string to the desired side. */
+function setFenActiveColor(fen: string, color: 'white' | 'black'): string {
+  const parts = fen.split(' ');
+  if (parts.length >= 2) {
+    parts[1] = color === 'white' ? 'w' : 'b';
+  }
+  return parts.join(' ');
+}
+
 export function ModelerPanel({
   currentFen,
   autoAnalyze,
   analyzePosition,
+  solveForColor,
 }: ModelerPanelProps): React.ReactElement {
   const [analysis, setAnalysis] = useState<PositionAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const lastFenRef = useRef<string>('');
 
-  const runAnalysis = useCallback(async (fen: string) => {
-    setIsAnalyzing(true);
-    setExpandedIdx(null);
-    try {
-      const result = await analyzePosition(fen);
-      setAnalysis(result);
-    } catch (err) {
-      setAnalysis({
-        fen,
-        moves: [],
-        error: String(err),
-      });
-    } finally {
-      setIsAnalyzing(false);
+  const runAnalysis = useCallback(
+    async (fen: string) => {
+      setIsAnalyzing(true);
+      setExpandedIdx(null);
+      try {
+        const adjustedFen = setFenActiveColor(fen, solveForColor);
+        const result = await analyzePosition(adjustedFen);
+        setAnalysis(result);
+      } catch (err) {
+        setAnalysis({
+          fen,
+          moves: [],
+          error: String(err),
+        });
+      } finally {
+        setIsAnalyzing(false);
+      }
+    },
+    [solveForColor],
+  );
+
+  // Re-analyze when solveForColor changes (if we have a previous analysis)
+  useEffect(() => {
+    if (analysis && !isAnalyzing) {
+      runAnalysis(currentFen);
     }
-  }, []);
+  }, [solveForColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-analyze when FEN changes (if enabled)
   useEffect(() => {
