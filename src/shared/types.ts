@@ -73,3 +73,26 @@ export interface StatusUpdate {
   status: StatusType;
   message: string;
 }
+
+// ── Chat thread types ─────────────────────────────────────────────────────────
+
+export type ChatMessageType =
+  | 'system'
+  | 'user-move'
+  | 'bot-move'
+  | 'evaluation'
+  | 'hint'
+  | 'explanation'
+  | 'user-question'
+  | 'ai-response'
+  | 'thinking';
+
+export interface ChatMessage {
+  id: string;
+  type: ChatMessageType;
+  timestamp: number;
+  text?: string;
+  moveSan?: string;
+  moveEvaluation?: MoveEvaluation;
+  hintResult?: HintResult;
+}

@@ -4,6 +4,7 @@ import {
   BotDifficulty,
   HintResult,
   MoveEvaluation,
+  ChatMessage,
 } from '../shared/types';
 import { FenInput } from './components/FenInput';
 import { InteractiveBoard } from './components/InteractiveBoard';
@@ -19,8 +20,13 @@ const DIFFICULTY_LABELS: Record<BotDifficulty, string> = {
   5: 'Master',
 };
 
+let nextMsgId = 1;
+function makeMsgId(): string {
+  return `msg-${nextMsgId++}-${Date.now()}`;
+}
+
 export default function App(): React.ReactElement {
-  // ── Engine hook (replaces window.chessHelper.* IPC) ──
+  // ── Engine hook ──
   const engine = useChessEngine();
 
   // ── Mode ──
@@ -38,6 +44,9 @@ export default function App(): React.ReactElement {
   const [gameOver, setGameOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Chat messages ──
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
   // ── Coach mode state ──
   const [difficulty, setDifficulty] = useState<BotDifficulty>(3);
   const [playerColor, setPlayerColor] = useState<'white' | 'black'>(() =>
@@ -51,11 +60,24 @@ export default function App(): React.ReactElement {
   const [autoAnalyze, setAutoAnalyze] = useState(false);
 
   const pendingHintRef = useRef<HintResult | null>(null);
+  const currentFenRef = useRef(currentFen);
+  currentFenRef.current = currentFen;
 
   // Ref to trigger bot move from the board component
   const triggerBotMoveRef = useRef<
     ((moveUci: string, moveSan: string) => void) | null
   >(null);
+
+  // ── Helper: add chat message ──
+  const addChatMessage = useCallback(
+    (msg: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+      setChatMessages((prev) => [
+        ...prev,
+        { ...msg, id: makeMsgId(), timestamp: Date.now() },
+      ]);
+    },
+    [],
+  );
 
   // ── Mode switching ──
   const handleModeChange = useCallback(
@@ -68,6 +90,7 @@ export default function App(): React.ReactElement {
       setGameOver(false);
       setIsBotThinking(false);
       setGameStarted(false);
+      setChatMessages([]);
       pendingHintRef.current = null;
       setCurrentFen('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
     },
@@ -86,6 +109,10 @@ export default function App(): React.ReactElement {
         } else {
           triggerBotMoveRef.current?.(result.moveUci, result.moveSan);
           setCurrentFen(result.fen);
+          addChatMessage({
+            type: 'bot-move',
+            moveSan: result.moveSan,
+          });
         }
       } catch (err) {
         setError(String(err));
@@ -93,7 +120,7 @@ export default function App(): React.ReactElement {
         setIsBotThinking(false);
       }
     },
-    [difficulty, mode, engine],
+    [difficulty, mode, engine, addChatMessage],
   );
 
   // ── Hint (coach mode) ──
@@ -110,6 +137,11 @@ export default function App(): React.ReactElement {
       } else {
         setHint(result);
         pendingHintRef.current = result;
+        addChatMessage({
+          type: 'hint',
+          text: result.coachingHint,
+          hintResult: result,
+        });
       }
     } catch (err) {
       setError(String(err));
@@ -118,7 +150,7 @@ export default function App(): React.ReactElement {
     } finally {
       setIsThinking(false);
     }
-  }, [currentFen, engine]);
+  }, [currentFen, engine, addChatMessage]);
 
   // ── Move made on board ──
   const handleMoveMade = useCallback(
@@ -132,13 +164,19 @@ export default function App(): React.ReactElement {
       setCurrentFen(info.fenAfter);
       setError(null);
 
-      // Modeler mode: just update FEN (ModelerPanel reacts via useEffect)
+      // Modeler mode: just update FEN
       if (mode === 'modeler') return;
 
       // Coach mode: only handle user moves here
       if (!info.isUserMove) return;
 
       setGameStarted(true);
+
+      // Add user move to chat
+      addChatMessage({
+        type: 'user-move',
+        moveSan: info.moveSan,
+      });
 
       if (pendingHintRef.current || alwaysEvaluate) {
         setIsThinking(true);
@@ -152,6 +190,11 @@ export default function App(): React.ReactElement {
             setError(result.error);
           } else {
             setMoveEvaluation(result);
+            addChatMessage({
+              type: 'evaluation',
+              moveEvaluation: result,
+              moveSan: info.moveSan,
+            });
           }
         } catch (err) {
           setError(String(err));
@@ -169,19 +212,94 @@ export default function App(): React.ReactElement {
         requestBotMove(info.fenAfter);
       }, 300);
     },
-    [mode, requestBotMove, engine, alwaysEvaluate],
+    [mode, requestBotMove, engine, alwaysEvaluate, addChatMessage],
+  );
+
+  // ── Explain a move evaluation (on-demand LLM) ──
+  const handleExplainMove = useCallback(
+    async (evaluation: MoveEvaluation) => {
+      setIsThinking(true);
+      try {
+        const explanation = await engine.explainMove(
+          evaluation,
+          currentFenRef.current,
+        );
+        addChatMessage({
+          type: 'explanation',
+          text: explanation,
+          moveEvaluation: evaluation,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsThinking(false);
+      }
+    },
+    [engine, addChatMessage],
+  );
+
+  // ── Send a follow-up chat message ──
+  const handleSendMessage = useCallback(
+    async (text: string) => {
+      // Add user question to chat
+      addChatMessage({
+        type: 'user-question',
+        text,
+      });
+
+      setIsThinking(true);
+      try {
+        // Build conversation history from recent messages
+        const history: { role: 'user' | 'assistant'; content: string }[] = [];
+        for (const msg of chatMessages) {
+          if (msg.type === 'user-question' && msg.text) {
+            history.push({ role: 'user', content: msg.text });
+          } else if (
+            (msg.type === 'ai-response' ||
+              msg.type === 'explanation' ||
+              msg.type === 'hint') &&
+            msg.text
+          ) {
+            history.push({ role: 'assistant', content: msg.text });
+          }
+        }
+
+        const answer = await engine.askFollowUp(
+          text,
+          currentFenRef.current,
+          history,
+        );
+
+        addChatMessage({
+          type: 'ai-response',
+          text: answer,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsThinking(false);
+      }
+    },
+    [engine, chatMessages, addChatMessage],
   );
 
   // ── Undo (coach mode) ──
-  const handleUndo = useCallback((restoredFen: string) => {
-    setCurrentFen(restoredFen);
-    setHint(null);
-    setMoveEvaluation(null);
-    setError(null);
-    setGameOver(false);
-    setIsBotThinking(false);
-    pendingHintRef.current = null;
-  }, []);
+  const handleUndo = useCallback(
+    (restoredFen: string) => {
+      setCurrentFen(restoredFen);
+      setHint(null);
+      setMoveEvaluation(null);
+      setError(null);
+      setGameOver(false);
+      setIsBotThinking(false);
+      pendingHintRef.current = null;
+      addChatMessage({
+        type: 'system',
+        text: 'Move undone.',
+      });
+    },
+    [addChatMessage],
+  );
 
   // ── Reset ──
   const handleReset = useCallback(() => {
@@ -193,6 +311,7 @@ export default function App(): React.ReactElement {
     setGameOver(false);
     setIsBotThinking(false);
     setGameStarted(false);
+    setChatMessages([]);
     pendingHintRef.current = null;
 
     if (mode === 'coach' && playerColor === 'black') {
@@ -206,11 +325,11 @@ export default function App(): React.ReactElement {
     setGameOver(true);
     setHint(null);
     pendingHintRef.current = null;
-  }, []);
-
-  const handleDismissEvaluation = useCallback(() => {
-    setMoveEvaluation(null);
-  }, []);
+    addChatMessage({
+      type: 'system',
+      text: '🏁 Game over!',
+    });
+  }, [addChatMessage]);
 
   const handleFenSubmit = useCallback(async (fen: string) => {
     setCurrentFen(fen);
@@ -379,11 +498,12 @@ export default function App(): React.ReactElement {
         <div className="app-panel-col">
           {mode === 'coach' ? (
             <CoachingPanel
-              hint={hint}
-              moveEvaluation={moveEvaluation}
+              messages={chatMessages}
               isThinking={isThinking}
               isBotThinking={isBotThinking}
               onRequestHint={handleRequestHint}
+              onExplainMove={handleExplainMove}
+              onSendMessage={handleSendMessage}
               canRequestHint={
                 engine.isReady &&
                 !isThinking &&
@@ -393,7 +513,6 @@ export default function App(): React.ReactElement {
               }
               gameOver={gameOver}
               error={error}
-              onDismissEvaluation={handleDismissEvaluation}
             />
           ) : (
             <ModelerPanel

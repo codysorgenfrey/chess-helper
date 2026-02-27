@@ -19,11 +19,18 @@ interface MultiPVLine {
   pv: string[];
 }
 
+/** Detect whether the browser supports SharedArrayBuffer (requires COOP/COEP). */
+const HAS_THREADS =
+  typeof SharedArrayBuffer !== 'undefined' &&
+  typeof navigator !== 'undefined' &&
+  (navigator.hardwareConcurrency ?? 1) > 1;
+
 export class StockfishWorker {
   private worker: Worker | null = null;
   private engineReady = false;
   private analyzing = false;
   private queue: Array<() => void> = [];
+  private threadsEnabled = false;
 
   // Per-analysis state
   private multiPVLines: Map<number, MultiPVLine> = new Map();
@@ -51,10 +58,16 @@ export class StockfishWorker {
       }, 30_000);
 
       try {
-        // Load the stockfish JS file as a standard Web Worker.
-        // The Emscripten-built JS detects the Worker context automatically
-        // and wires up onmessage/postMessage for UCI communication.
-        this.worker = new Worker('/stockfish/stockfish-nnue-16-single.js');
+        // Use the multi-threaded build when SharedArrayBuffer is available;
+        // fall back to the single-threaded build otherwise.
+        const engineFile = HAS_THREADS
+          ? '/stockfish/stockfish-nnue-16.js'
+          : '/stockfish/stockfish-nnue-16-single.js';
+        this.threadsEnabled = HAS_THREADS;
+        console.log(
+          `[StockfishWorker] Using ${HAS_THREADS ? 'multi-threaded' : 'single-threaded'} engine`,
+        );
+        this.worker = new Worker(engineFile);
       } catch (err) {
         clearTimeout(timeout);
         reject(
@@ -77,6 +90,12 @@ export class StockfishWorker {
         if (!this.engineReady) {
           if (line === 'uciok' && !uciokSeen) {
             uciokSeen = true;
+            // Configure threads when using the multi-threaded build
+            if (this.threadsEnabled) {
+              const threads = Math.min(navigator.hardwareConcurrency ?? 1, 4);
+              this.send(`setoption name Threads value ${threads}`);
+              console.log(`[StockfishWorker] Set Threads to ${threads}`);
+            }
             this.send('isready');
           }
           if (line === 'readyok') {
