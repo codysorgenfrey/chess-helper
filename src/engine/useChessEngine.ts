@@ -27,7 +27,7 @@ import {
 
 // ── Settings (replaces electron-store) ──────────────────────────────────────
 
-const ANALYSIS_DEPTH = 18;
+const ANALYSIS_DEPTH = 14;
 const MULTI_PV = 5;
 
 // ── Bot difficulty config (from ipc-handlers.ts) ─────────────────────────────
@@ -378,7 +378,7 @@ export function useChessEngine(): ChessEngineAPI {
 
       sendStatus('analyzing', 'Evaluating your move…');
       try {
-        const multiPV = Math.max(MULTI_PV, 8);
+        const multiPV = MULTI_PV;
         const moves = await engine.analyze(fen, ANALYSIS_DEPTH, multiPV);
         if (moves.length === 0) {
           sendStatus('done', 'No moves to evaluate');

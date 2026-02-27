@@ -17,7 +17,14 @@ const root = join(__dirname, '..');
 const src = join(root, 'node_modules', 'stockfish', 'src');
 const dest = join(root, 'public', 'stockfish');
 
-const files = ['stockfish-nnue-16-single.js', 'stockfish-nnue-16-single.wasm'];
+const files = [
+  // Multi-threaded build (used when SharedArrayBuffer is available)
+  'stockfish-nnue-16.js',
+  'stockfish-nnue-16.wasm',
+  // Single-threaded fallback
+  'stockfish-nnue-16-single.js',
+  'stockfish-nnue-16-single.wasm',
+];
 
 mkdirSync(dest, { recursive: true });
 
