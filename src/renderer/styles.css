@@ -1363,14 +1363,19 @@ kbd {
   font-style: italic;
 }
 
-/* ── User move ── */
+/* ── User move (combined with optional evaluation) ── */
 .chat-msg--user-move {
   align-self: flex-end;
   background: rgba(91, 138, 240, 0.12);
   border: 1px solid rgba(91, 138, 240, 0.2);
+  max-width: 85%;
+}
+
+.chat-user-move-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .chat-msg--user-move .chat-msg-icon {
@@ -1385,6 +1390,59 @@ kbd {
   font-family: var(--font-mono);
   font-weight: 700;
   color: var(--accent-blue);
+}
+
+.chat-user-move-quality {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.chat-user-move-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.chat-user-move-details .chat-eval-best strong {
+  font-family: var(--font-mono);
+  color: var(--accent-green);
+}
+
+/* Quality color variants on user-move */
+.chat-msg--user-move.quality--best {
+  background: rgba(76, 175, 125, 0.1);
+  border-color: rgba(76, 175, 125, 0.3);
+}
+
+.chat-msg--user-move.quality--excellent {
+  background: rgba(142, 201, 126, 0.08);
+  border-color: rgba(142, 201, 126, 0.25);
+}
+
+.chat-msg--user-move.quality--good {
+  background: rgba(91, 138, 240, 0.08);
+  border-color: rgba(91, 138, 240, 0.2);
+}
+
+.chat-msg--user-move.quality--inaccuracy {
+  background: rgba(232, 197, 71, 0.08);
+  border-color: rgba(232, 197, 71, 0.25);
+}
+
+.chat-msg--user-move.quality--mistake {
+  background: rgba(224, 123, 74, 0.08);
+  border-color: rgba(224, 123, 74, 0.25);
+}
+
+.chat-msg--user-move.quality--blunder {
+  background: rgba(224, 87, 87, 0.1);
+  border-color: rgba(224, 87, 87, 0.3);
 }
 
 /* ── Bot move ── */
@@ -1410,11 +1468,9 @@ kbd {
   font-weight: 700;
 }
 
-/* ── Evaluation ── */
+/* ── Evaluation (legacy — now inline on user-move) ── */
 .chat-msg--evaluation {
-  align-self: flex-start;
-  max-width: 85%;
-  border: 1px solid var(--border);
+  display: none;
 }
 
 .chat-eval-header {

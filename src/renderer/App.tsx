@@ -176,12 +176,14 @@ export default function App(): React.ReactElement {
       setGameStarted(true);
 
       // Add user move to chat
-      addChatMessage({
+      const userMoveMsg: Omit<ChatMessage, 'id' | 'timestamp'> = {
         type: 'user-move',
         moveSan: info.moveSan,
-      });
+      };
 
       if (pendingHintRef.current || alwaysEvaluate) {
+        // Add the move message immediately (evaluation will be attached later)
+        addChatMessage(userMoveMsg);
         setIsThinking(true);
         try {
           const result = await engine.evaluateMove(
@@ -193,10 +195,19 @@ export default function App(): React.ReactElement {
             setError(result.error);
           } else {
             setMoveEvaluation(result);
-            addChatMessage({
-              type: 'evaluation',
-              moveEvaluation: result,
-              moveSan: info.moveSan,
+            // Update the last user-move message with the evaluation
+            setChatMessages((prev) => {
+              const updated = [...prev];
+              for (let i = updated.length - 1; i >= 0; i--) {
+                if (
+                  updated[i].type === 'user-move' &&
+                  updated[i].moveSan === info.moveSan
+                ) {
+                  updated[i] = { ...updated[i], moveEvaluation: result };
+                  break;
+                }
+              }
+              return updated;
             });
           }
         } catch (err) {
@@ -206,6 +217,7 @@ export default function App(): React.ReactElement {
           pendingHintRef.current = null;
         }
       } else {
+        addChatMessage(userMoveMsg);
         setHint(null);
         setMoveEvaluation(null);
       }

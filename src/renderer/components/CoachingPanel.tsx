@@ -47,13 +47,57 @@ function SystemMessage({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function UserMoveMessage({ msg }: { msg: ChatMessage }) {
+function UserMoveMessage({
+  msg,
+  onExplain,
+}: {
+  msg: ChatMessage;
+  onExplain: (evaluation: MoveEvaluation) => void;
+}) {
+  const evaluation = msg.moveEvaluation;
+  const config = evaluation ? qualityConfig[evaluation.quality] : null;
+
   return (
-    <div className="chat-msg chat-msg--user-move">
-      <span className="chat-msg-icon">♟</span>
-      <span className="chat-msg-text">
-        You played <strong>{msg.moveSan}</strong>
-      </span>
+    <div
+      className={`chat-msg chat-msg--user-move${config ? ` ${config.className}` : ''}`}
+    >
+      <div className="chat-user-move-row">
+        <span className="chat-msg-icon">♟</span>
+        <span className="chat-msg-text">
+          You played <strong>{msg.moveSan}</strong>
+        </span>
+        {config && (
+          <span className="chat-user-move-quality">
+            <span className="chat-eval-icon">{config.icon}</span>
+            <span className="chat-eval-label">{config.label}</span>
+          </span>
+        )}
+      </div>
+      {evaluation && evaluation.quality !== 'best' && (
+        <div className="chat-user-move-details">
+          <span className="chat-eval-best">
+            Best: <strong>{evaluation.bestMoveSan}</strong>
+          </span>
+          <button
+            className="chat-explain-btn"
+            onClick={() => onExplain(evaluation)}
+            title="Ask the AI coach to explain this evaluation"
+          >
+            🧠 Explain
+          </button>
+        </div>
+      )}
+      {evaluation && evaluation.quality === 'best' && (
+        <div className="chat-user-move-details">
+          <button
+            className="chat-explain-btn"
+            onClick={() => onExplain(evaluation)}
+            title="Ask the AI coach to explain this evaluation"
+          >
+            🧠 Explain
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -178,11 +222,11 @@ function ChatMessageItem({
     case 'system':
       return <SystemMessage msg={msg} />;
     case 'user-move':
-      return <UserMoveMessage msg={msg} />;
+      return <UserMoveMessage msg={msg} onExplain={onExplain} />;
     case 'bot-move':
       return <BotMoveMessage msg={msg} />;
     case 'evaluation':
-      return <EvaluationMessage msg={msg} onExplain={onExplain} />;
+      return null; // evaluations are now shown inline on user-move
     case 'hint':
       return <HintMessage msg={msg} />;
     case 'explanation':
