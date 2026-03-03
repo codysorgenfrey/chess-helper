@@ -58,6 +58,8 @@ export interface MoveEvaluation {
   quality: MoveQuality;
   explanation: string;
   centipawnLoss: number;
+  /** FEN of the position *before* the user's move (for correct LLM context) */
+  fen?: string;
 }
 
 export type StatusType =

@@ -104,6 +104,11 @@ export function InteractiveBoard({
   // Click-to-move state
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
 
+  // Last move highlight
+  const [lastMove, setLastMove] = useState<{ from: Square; to: Square } | null>(
+    null,
+  );
+
   // Keep board orientation in sync with player color
   useEffect(() => {
     setBoardOrientation(playerColor);
@@ -128,6 +133,7 @@ export function InteractiveBoard({
           if (move) {
             setCoachHistory((prev) => [...prev, fenBefore]);
             setMoveHistory((prev) => [...prev, move.san]);
+            setLastMove({ from: move.from as Square, to: move.to as Square });
             const fenAfter = game.fen();
             const newGame = new Chess(fenAfter);
             setGame(newGame);
@@ -225,6 +231,7 @@ export function InteractiveBoard({
         if (move) {
           setCoachHistory((prev) => [...prev, fenBefore]);
           setMoveHistory((prev) => [...prev, move.san]);
+          setLastMove({ from: move.from as Square, to: move.to as Square });
           const fenAfter = game.fen();
           const newGame = new Chess(fenAfter);
           setGame(newGame);
@@ -341,6 +348,14 @@ export function InteractiveBoard({
   // Highlight selected square and legal move targets
   const squareStyles = useMemo(() => {
     const styles: Record<string, React.CSSProperties> = {};
+
+    // Highlight last move squares
+    if (lastMove) {
+      const lastMoveStyle = { backgroundColor: 'rgba(255, 255, 0, 0.4)' };
+      styles[lastMove.from] = lastMoveStyle;
+      styles[lastMove.to] = lastMoveStyle;
+    }
+
     if (!selectedSquare) return styles;
 
     styles[selectedSquare] = { backgroundColor: 'rgba(255, 255, 0, 0.4)' };
@@ -368,10 +383,11 @@ export function InteractiveBoard({
     }
 
     return styles;
-  }, [selectedSquare, game, moveHistory, mode]);
+  }, [selectedSquare, game, moveHistory, mode, lastMove]);
 
   const handleUndo = useCallback(() => {
     setSelectedSquare(null);
+    setLastMove(null);
     if (mode === 'modeler') {
       // Modeler free mode: pop from our undo stack
       if (freeHistory.length > 0) {
@@ -405,6 +421,7 @@ export function InteractiveBoard({
 
   const handleReset = useCallback(() => {
     setSelectedSquare(null);
+    setLastMove(null);
     const newGame = new Chess();
     setGame(newGame);
     setMoveHistory([]);
@@ -427,6 +444,7 @@ export function InteractiveBoard({
     setFreePosition(newGame.fen());
     setFreeHistory([]);
     setSelectedSquare(null);
+    setLastMove(null);
   }, [mode]);
 
   // Status text

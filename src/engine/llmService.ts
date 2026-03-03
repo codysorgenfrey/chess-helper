@@ -67,8 +67,6 @@ export async function generateLLMHint(
         : 'unknown';
 
   const moveNumber = parseInt(fen.split(' ')[5] || '1');
-  const phase =
-    moveNumber <= 10 ? 'opening' : moveNumber <= 25 ? 'middlegame' : 'endgame';
   const sideToMove = fen.split(' ')[1] === 'w' ? 'White' : 'Black';
 
   const messages: ChatMessage[] = [
@@ -80,14 +78,13 @@ RULES:
 - Give a helpful coaching hint that guides the student toward the best move WITHOUT telling them the exact move or the exact square.
 - Mention the type of idea (tactic, positional plan, piece activity, king safety, pawn structure, etc.).
 - You may mention which piece type to look at (e.g. "look at what your knight can do") but NEVER say the exact square it should go to.
-- Keep the hint to 2-4 sentences, conversational and encouraging.
-- Reference the game phase (${phase}) if relevant.
+- Keep the hint to 2-4 sentences.
 - Do NOT use chess notation like "Nf3" or "e2e4".`,
     },
     {
       role: 'user',
       content: `Position (FEN): ${fen}
-Game phase: ${phase}
+Move number: ${moveNumber}
 Engine's best move: ${bestMoveSan} (${bestMoveUci})
 Evaluation: ${evalStr}
 Principal variation (next few moves): ${pv.slice(0, 5).join(' ')}
@@ -129,8 +126,6 @@ export async function generateLLMExplanation(
         : 'unknown';
 
   const moveNumber = parseInt(fen.split(' ')[5] || '1');
-  const phase =
-    moveNumber <= 10 ? 'opening' : moveNumber <= 25 ? 'middlegame' : 'endgame';
   const sideToMove = fen.split(' ')[1] === 'w' ? 'White' : 'Black';
 
   const messages: ChatMessage[] = [
@@ -149,7 +144,7 @@ RULES:
     {
       role: 'user',
       content: `Position (FEN): ${fen}
-Game phase: ${phase}
+Move number: ${moveNumber}
 Student played: ${userMoveSan} (eval: ${userEvalStr})
 Best move was: ${bestMoveSan} (eval: ${bestEvalStr})
 Move quality: ${quality}

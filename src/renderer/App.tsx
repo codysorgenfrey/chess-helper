@@ -69,6 +69,11 @@ export default function App(): React.ReactElement {
   const currentFenRef = useRef(currentFen);
   currentFenRef.current = currentFen;
 
+  // Generation counter to detect stale bot move requests after undo/reset
+  const moveGenRef = useRef(0);
+  // Timeout ID for the delayed bot move trigger
+  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Ref to trigger bot move from the board component
   const triggerBotMoveRef = useRef<
     ((moveUci: string, moveSan: string) => void) | null
@@ -107,9 +112,12 @@ export default function App(): React.ReactElement {
   const requestBotMove = useCallback(
     async (fen: string) => {
       if (mode !== 'coach') return;
+      const gen = moveGenRef.current;
       setIsBotThinking(true);
       try {
         const result = await engine.getBotMove(fen, difficulty);
+        // If undo/reset happened while waiting, discard the stale result
+        if (gen !== moveGenRef.current) return;
         if ('error' in result) {
           setError(result.error);
         } else {
@@ -121,9 +129,12 @@ export default function App(): React.ReactElement {
           });
         }
       } catch (err) {
+        if (gen !== moveGenRef.current) return;
         setError(String(err));
       } finally {
-        setIsBotThinking(false);
+        if (gen === moveGenRef.current) {
+          setIsBotThinking(false);
+        }
       }
     },
     [difficulty, mode, engine, addChatMessage],
@@ -197,7 +208,9 @@ export default function App(): React.ReactElement {
           if ('error' in result) {
             setError(result.error);
           } else {
-            setMoveEvaluation(result);
+            // Attach the FEN so explanations use the correct position
+            const evalWithFen = { ...result, fen: info.fenBefore };
+            setMoveEvaluation(evalWithFen);
             // Update the last user-move message with the evaluation
             setChatMessages((prev) => {
               const updated = [...prev];
@@ -206,7 +219,7 @@ export default function App(): React.ReactElement {
                   updated[i].type === 'user-move' &&
                   updated[i].moveSan === info.moveSan
                 ) {
-                  updated[i] = { ...updated[i], moveEvaluation: result };
+                  updated[i] = { ...updated[i], moveEvaluation: evalWithFen };
                   break;
                 }
               }
@@ -226,9 +239,13 @@ export default function App(): React.ReactElement {
       }
 
       // Bot responds after a short delay
-      setTimeout(() => {
+      if (botTimeoutRef.current !== null) {
+        clearTimeout(botTimeoutRef.current);
+      }
+      botTimeoutRef.current = setTimeout(() => {
+        botTimeoutRef.current = null;
         requestBotMove(info.fenAfter);
-      }, 300);
+      }, 800);
     },
     [mode, requestBotMove, engine, alwaysEvaluate, addChatMessage],
   );
@@ -240,7 +257,7 @@ export default function App(): React.ReactElement {
       try {
         const explanation = await engine.explainMove(
           evaluation,
-          currentFenRef.current,
+          evaluation.fen || currentFenRef.current,
         );
         addChatMessage({
           type: 'explanation',
@@ -302,25 +319,54 @@ export default function App(): React.ReactElement {
   );
 
   // ── Undo (coach mode) ──
-  const handleUndo = useCallback(
-    (restoredFen: string) => {
-      setCurrentFen(restoredFen);
-      setHint(null);
-      setMoveEvaluation(null);
-      setError(null);
-      setGameOver(false);
-      setIsBotThinking(false);
-      pendingHintRef.current = null;
-      addChatMessage({
-        type: 'system',
-        text: 'Move undone.',
-      });
-    },
-    [addChatMessage],
-  );
+  const handleUndo = useCallback((restoredFen: string) => {
+    // Cancel any pending/in-flight bot move
+    if (botTimeoutRef.current !== null) {
+      clearTimeout(botTimeoutRef.current);
+      botTimeoutRef.current = null;
+    }
+    moveGenRef.current++;
+
+    setCurrentFen(restoredFen);
+    setHint(null);
+    setMoveEvaluation(null);
+    setError(null);
+    setGameOver(false);
+    setIsBotThinking(false);
+    pendingHintRef.current = null;
+
+    // Remove the undone move(s) and any messages that followed them
+    // (bot response, hints, explanations, follow-up Q&A for that state)
+    setChatMessages((prev) => {
+      let lastUserMoveIdx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].type === 'user-move') {
+          lastUserMoveIdx = i;
+          break;
+        }
+      }
+      const base = lastUserMoveIdx >= 0 ? prev.slice(0, lastUserMoveIdx) : prev;
+      return [
+        ...base,
+        {
+          id: makeMsgId(),
+          timestamp: Date.now(),
+          type: 'system' as const,
+          text: 'Move undone.',
+        },
+      ];
+    });
+  }, []);
 
   // ── Reset ──
   const handleReset = useCallback(() => {
+    // Cancel any pending/in-flight bot move
+    if (botTimeoutRef.current !== null) {
+      clearTimeout(botTimeoutRef.current);
+      botTimeoutRef.current = null;
+    }
+    moveGenRef.current++;
+
     const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
     setCurrentFen(startFen);
     setHint(null);
