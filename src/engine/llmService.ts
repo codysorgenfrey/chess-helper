@@ -42,7 +42,92 @@ async function chatCompletion(
   return content;
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// ── Board description helper ────────────────────────────────────────────────
+
+const PIECE_NAMES: Record<string, string> = {
+  K: 'King',
+  Q: 'Queen',
+  R: 'Rook',
+  B: 'Bishop',
+  N: 'Knight',
+  P: 'Pawn',
+  k: 'King',
+  q: 'Queen',
+  r: 'Rook',
+  b: 'Bishop',
+  n: 'Knight',
+  p: 'Pawn',
+};
+
+const PIECE_SYMBOLS: Record<string, string> = {
+  K: '♔',
+  Q: '♕',
+  R: '♖',
+  B: '♗',
+  N: '♘',
+  P: '♙',
+  k: '♚',
+  q: '♛',
+  r: '♜',
+  b: '♝',
+  n: '♞',
+  p: '♟',
+};
+
+/**
+ * Convert a FEN string into a human-readable board description that an LLM
+ * can interpret unambiguously. Returns an ASCII board diagram plus an
+ * explicit piece-by-square listing for each side.
+ */
+function describeBoardFromFen(fen: string): string {
+  const placement = fen.split(' ')[0];
+  const ranks = placement.split('/');
+
+  // Build piece lists
+  const whitePieces: string[] = [];
+  const blackPieces: string[] = [];
+
+  // Build ASCII board
+  const boardLines: string[] = ['  a b c d e f g h'];
+
+  for (let r = 0; r < 8; r++) {
+    const rankNum = 8 - r;
+    let file = 0;
+    let line = `${rankNum} `;
+    for (const ch of ranks[r]) {
+      if (ch >= '1' && ch <= '8') {
+        for (let i = 0; i < parseInt(ch); i++) {
+          line += '. ';
+          file++;
+        }
+      } else {
+        const fileLetter = String.fromCharCode(97 + file); // a-h
+        const square = `${fileLetter}${rankNum}`;
+        const name = PIECE_NAMES[ch] ?? ch;
+        const symbol = PIECE_SYMBOLS[ch] ?? ch;
+
+        line += symbol + ' ';
+
+        if (ch === ch.toUpperCase()) {
+          whitePieces.push(`${name} on ${square}`);
+        } else {
+          blackPieces.push(`${name} on ${square}`);
+        }
+        file++;
+      }
+    }
+    boardLines.push(line.trimEnd());
+  }
+  boardLines.push('  a b c d e f g h');
+
+  return [
+    'Board diagram:',
+    boardLines.join('\n'),
+    '',
+    `White pieces: ${whitePieces.join(', ') || 'none'}`,
+    `Black pieces: ${blackPieces.join(', ') || 'none'}`,
+  ].join('\n');
+}
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -83,7 +168,8 @@ RULES:
     },
     {
       role: 'user',
-      content: `Position (FEN): ${fen}
+      content: `${describeBoardFromFen(fen)}
+
 Move number: ${moveNumber}
 Engine's best move: ${bestMoveSan} (${bestMoveUci})
 Evaluation: ${evalStr}
@@ -143,7 +229,8 @@ RULES:
     },
     {
       role: 'user',
-      content: `Position (FEN): ${fen}
+      content: `${describeBoardFromFen(fen)}
+
 Move number: ${moveNumber}
 Student played: ${userMoveSan} (eval: ${userEvalStr})
 Best move was: ${bestMoveSan} (eval: ${bestEvalStr})
@@ -176,7 +263,7 @@ export async function chatFollowUp(
       role: 'system',
       content: `You are a friendly, expert chess coach having a conversation with a student. The current position is in the ${phase} phase, and it is ${sideToMove} to move.
 
-FEN: ${fen}
+${describeBoardFromFen(fen)}
 
 RULES:
 - Answer the student's chess questions clearly and helpfully.
